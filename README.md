@@ -39,3 +39,18 @@ Este pedido é para o Claude Code. Instale para mim o app de vistoria de imóvei
 5. Ele devolve o link do app. Abra esse link no celular, pelo aplicativo do Claude. Na primeira vez, o próprio app pede o nome da empresa, a cidade e a logo, sugere as cores, cria a pasta no Google Drive e confere se está tudo funcionando.
 
 **Se o Claude pedir o arquivo:** abra https://github.com/lucasnevez/vistoria-de-imoveis/blob/main/vistoria-app.html, clique no botão de download ("Download raw file", o ícone de seta para baixo, à direita) e salve o arquivo na mesma pasta que você escolheu no passo 2. Depois escreva "pronto, o arquivo está na pasta".
+
+## Como atualizar um app já instalado
+
+Colar a mensagem de instalação de novo cria um app novo, vazio. Para atualizar o app que você já usa, sem perder as vistorias e sem mudar o link, cole esta mensagem na aba **Code**, trocando o trecho indicado pelo link do seu app:
+
+```
+Este pedido é para o Claude Code. Atualize o meu app de vistoria para a versão mais nova, sem criar um link novo:
+1. Baixe o arquivo pelo terminal, por exemplo com: curl -fsSL -o vistoria-app.html https://raw.githubusercontent.com/lucasnevez/vistoria-de-imoveis/main/vistoria-app.html
+   Confira que ele tem mais de 150 KB e que a última linha é </script>. Não use busca na web nem leitura de página.
+2. Leia o meu app atual com a ferramenta Artifact (action "read") neste link: COLE AQUI O LINK DO SEU APP
+3. Republique o arquivo baixado nesse mesmo link, passando a url dele e sem passar capacidades, para manter as atuais e todas as vistorias. Se o meu conector do Google Drive não se chamar exatamente "Google Drive", troque esse nome na linha const DRIVE antes.
+4. Me diga qual versão ficou publicada: é o valor de const VERSAO no arquivo.
+```
+
+A versão em uso aparece no app, em Configurações, no fim da página. A versão mais nova está no topo desta página e no [histórico de versões](CHANGELOG.md).
