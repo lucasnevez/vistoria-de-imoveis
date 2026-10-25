@@ -302,6 +302,8 @@ const SIT_OK = new Set(SITUACOES.map((s) => s[0]));
 const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'])[1];
 const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
 const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
+/* Versão do app: atualize junto com o CHANGELOG.md e a tag do GitHub a cada mudança. */
+const VERSAO = '1.1.0';
 const MAX_FOTOS = 20;
 const DRIVE = 'Google Drive';
 const FOLDER = 'application/vnd.google-apps.folder';
@@ -785,7 +787,7 @@ async function salvarCopia(v, rotulo) {
   try {
     const d = await garantirPastas(v);
     if (!d.dados) { const f = await criarPasta('Dados', d.pasta); d.dados = f.id; markDirty(); }
-    const corpo = JSON.stringify({ app: 'Vistoria de Imóveis', formato: 1, geradoEm: new Date().toISOString(), vistoria: v }, null, 1);
+    const corpo = JSON.stringify({ app: 'Vistoria de Imóveis', versao: VERSAO, formato: 1, geradoEm: new Date().toISOString(), vistoria: v }, null, 1);
     const f = arquivoDe(await drive('create_file', {
       title: `Dados da vistoria - ${rotulo}.json`, parentId: d.dados,
       contentMimeType: 'application/json', disableConversionToGoogleType: true, textContent: corpo,
@@ -2511,6 +2513,7 @@ function viewConfig() {
       <p class="hint">Vale a pena o advogado da imobiliária conferir estes dois textos. As mudanças são salvas sozinhas.</p>
     </section>
     ${S.permissions ? `<section class="card"><h3>Permissões</h3><p class="hint">Na primeira vez, o app pede licença para usar o Claude e o Google Drive. Aqui você revê o que liberou.</p><div><button class="btn" data-act="permissoes">Revisar permissões</button></div></section>` : ''}
+    <p class="hint">Versão do app: ${VERSAO}. Novidades em github.com/lucasnevez/vistoria-de-imoveis.</p>
   </main>`;
 }
 function render() {

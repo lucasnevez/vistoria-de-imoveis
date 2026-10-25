@@ -1,5 +1,7 @@
 # Vistoria de Imóveis
 
+**Versão atual: 1.1.0** (25/10/2026). O que mudou em cada versão está no [histórico de versões](CHANGELOG.md).
+
 App de vistoria de entrada e saída de aluguel que roda dentro do Claude.
 
 - As fotos são feitas no celular, em blocos de até 20.
