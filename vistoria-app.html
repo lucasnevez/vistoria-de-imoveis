@@ -248,6 +248,14 @@ label.btn { position: relative; }
 .previa img { max-height: 44px; max-width: min(120px, 30%); object-fit: contain; flex: none; }
 .ic-ok { width: 28px; height: 28px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); flex: none; }
 .rev-row { cursor: pointer; }
+.capas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .capas { grid-template-columns: 1fr; } }
+.capa-op { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: transparent; border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; color: var(--fg); text-align: left; min-width: 0; font: inherit; }
+.capa-op:hover { border-color: var(--line-2); }
+.capa-op.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.capa-op .previa { min-height: 86px; padding: 14px; }
+.capa-op .previa b { font-size: 1rem; }
+.capa-rot { font-size: var(--fs-s); font-weight: 700; padding: 0 4px 2px; }
 .combo { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--line-2); background: transparent; color: var(--fg); border-radius: var(--r); cursor: pointer; font-weight: 600; font-size: var(--fs-s); }
 .combo:hover { border-color: var(--stroke); }
 .combo i { width: 18px; height: 18px; display: block; border: 1px solid rgba(255, 255, 255, 0.25); }
@@ -339,10 +347,27 @@ function aplicarTema() {
   const ac = corParaFundoEscuro(corCfg('corPrincipal'));
   r.setProperty('--accent', ac);
   r.setProperty('--accent-ink', tintaSobre(ac));
-  r.setProperty('--capa', corCfg('corCapa'));
+  r.setProperty('--capa', estiloCapa() === 'clara' ? '#FFFFFF' : corCfg('corCapa'));
   let base = rgbDe(corCfg('corCapa'));
   for (let i = 0; i < 12 && lum(base) > 0.05; i++) base = misturar(base, [0, 0, 0], 0.2);
   r.setProperty('--grad', `radial-gradient(130% 90% at 20% 0%, ${hexDe(misturar(base, [255, 255, 255], 0.1))} 0%, ${hexDe(base)} 35%, ${hexDe(misturar(base, [0, 0, 0], 0.5))} 70%, ${hexDe(misturar(base, [0, 0, 0], 0.75))} 100%)`);
+}
+function creciFmt(x) {
+  x = String(x || '').trim();
+  if (!x) return '';
+  return /^creci/i.test(x) ? x.replace(/^creci[\s:.-]*/i, 'CRECI ') : 'CRECI ' + x;
+}
+function estiloCapa() {
+  const e = S.cfg.estiloCapa;
+  if (e === 'clara' || e === 'escura') return e;
+  return lum(rgbDe(corCfg('corCapa'))) > 0.45 ? 'clara' : 'escura';
+}
+function capaCores(estilo) {
+  const corP = corCfg('corPrincipal'), capa = corCfg('corCapa');
+  if (estilo === 'clara') return { fundo: '#FFFFFF', tit: '#161E26', ac: corParaFundoClaro(corP), sub: '#606A75', regua: corParaFundoClaro(corP) };
+  const tit = tintaSobre(capa);
+  const clara = lum(rgbDe(capa)) > 0.45;
+  return { fundo: capa, tit, ac: clara ? corParaFundoClaro(corP) : corParaFundoEscuro(corP), sub: hexDe(misturar(rgbDe(tit), rgbDe(capa), 0.35)), regua: '' };
 }
 function nomeApp() { const e = String(S.cfg.empresa || '').trim(); return e ? `Vistoria ${e}` : 'Vistoria de Imóveis'; }
 function marcaHTML(alt) {
@@ -359,6 +384,7 @@ const S = {
   podeEscrever: true, imgMax: 0, fileArgs: false, meuNome: '', meuId: null, souDono: false,
   cfgOcupado: false, cfgAviso: '', novaPasta: '', nomes: {},
   verif: null, verificando: false, revisao: null, coresSugeridas: null,
+  modoEnvio: null, avisoFotos: null,
   lista: [], listaCarregada: false, listaErro: null,
   cfg: { ...CFG_PADRAO },
   tela: 'home', filtro: 'todas',
@@ -688,17 +714,70 @@ function garantirPastas(v) {
   pastaPromises.set(v.id, p);
   return p;
 }
-async function enviarArquivo(blob, title, mime, parentId, nomeArquivo) {
+/* Envio ao Drive em dois jeitos: o arquivo anexado à chamada (quando a tela permite) e o conteúdo em texto.
+   Se um falhar, o outro é tentado; o jeito que funcionou fica valendo para as próximas fotos. */
+const ERROS_SEM_SEGUNDA_TENTATIVA = new Set(['needs_reauth', 'server_not_connected', 'selection_required', 'blocked_by_policy', 'approval_required', 'not_in_manifest', 'not_granted', 'capability_disabled', 'capability_removed', 'sem_mcp']);
+function detalheErro(e) {
+  if (!e) return '';
+  const msg = String(e.message || '').replace(/\s+/g, ' ').slice(0, 220);
+  return `${e.code || 'erro'}${e.modo ? ' (' + e.modo + ')' : ''}${msg ? ': ' + msg : ''}`;
+}
+async function enviarComo(modo, blob, title, mime, parentId, nomeArquivo) {
   const input = { title, parentId, contentMimeType: mime, disableConversionToGoogleType: true };
-  if (S.fileArgs) input.base64Content = { $file: { data: blob, name: nomeArquivo, type: mime } };
+  if (modo === 'arquivo') input.base64Content = { $file: { data: blob, name: nomeArquivo, type: mime } };
   else {
-    const b64 = await paraBase64(blob);
+    let b64 = await paraBase64(blob);
+    if (b64.length > 980000 && mime === 'image/jpeg') {
+      for (const [lado, q] of [[1400, 0.75], [1200, 0.7], [1000, 0.65]]) {
+        b64 = await paraBase64((await reduzir(blob, lado, q)).blob);
+        if (b64.length <= 980000) break;
+      }
+    }
     if (b64.length > 980000) throw { code: 'grande' };
     input.base64Content = b64;
   }
   const f = arquivoDe(await drive('create_file', input));
   if (!f) throw { code: 'formato', message: 'O Drive respondeu sem o código do arquivo.' };
   return f;
+}
+async function enviarArquivo(blob, title, mime, parentId, nomeArquivo) {
+  let modos = S.fileArgs ? ['arquivo', 'texto'] : ['texto'];
+  if (S.modoEnvio && modos.includes(S.modoEnvio)) modos = [S.modoEnvio, ...modos.filter((m) => m !== S.modoEnvio)];
+  let ultimo = null;
+  for (const modo of modos) {
+    try {
+      const f = await enviarComo(modo, blob, title, mime, parentId, nomeArquivo);
+      S.modoEnvio = modo;
+      return f;
+    } catch (e) {
+      ultimo = (e && typeof e === 'object') ? { ...e, modo } : { code: 'erro', message: String(e), modo };
+      if (ERROS_SEM_SEGUNDA_TENTATIVA.has(ultimo.code)) break;
+    }
+  }
+  throw ultimo;
+}
+async function reenviarFotos() {
+  const v = S.v;
+  if (!v || S.busy) return;
+  const faltam = v.fotos.filter((f) => !f.drive && !f.pendente);
+  if (!faltam.length) { toast('Todas as fotos já estão no Drive.'); return; }
+  S.busy = { vid: v.id, titulo: 'Reenviando as fotos ao Drive', podeParar: false, passos: [{ k: 'fotos', txt: 'Enviando as fotos que faltavam para a pasta Imagens', st: 'run', det: `0 de ${faltam.length}` }] };
+  render();
+  const r = await enviarFotosDrive(v, faltam, (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`));
+  markDirty();
+  await flush();
+  S.busy = null;
+  S.avisoFotos = r.erro && r.ok < r.total ? { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) } : null;
+  render();
+  toast(r.ok === r.total ? 'Todas as fotos foram para o Drive.' : `${r.ok} de ${r.total} fotos enviadas.`);
+}
+function viewFotosDrive(v) {
+  const total = v.fotos.filter((f) => !f.pendente).length;
+  if (!total) return '';
+  const no = v.fotos.filter((f) => f.drive && !f.pendente).length;
+  const av = S.avisoFotos && S.avisoFotos.vid === v.id ? S.avisoFotos : null;
+  if (no >= total && !av) return `<p class="hint">Fotos na pasta Imagens do Drive: ${no} de ${total}.</p>`;
+  return `<div class="msg ${no >= total ? 'ok' : 'warn'}"><p>Fotos na pasta Imagens do Drive: ${no} de ${total}.${no < total ? ' As que faltam continuam guardadas no app.' : ''}</p>${av ? `<p>${esc(av.texto)}</p><p class="hint">Detalhe técnico, para mandar ao suporte: ${esc(av.detalhe)}</p>` : ''}${no < total ? '<div class="row"><button class="btn sm" data-act="reenviar-fotos">Reenviar fotos ao Drive</button></div>' : ''}</div>`;
 }
 /* Cópia de segurança: os dados completos da vistoria vão para a subpasta Dados, num arquivo novo a cada lote e a cada laudo. */
 async function salvarCopia(v, rotulo) {
@@ -746,13 +825,7 @@ async function enviarFotosDrive(v, fotos, aoAvancar, signal) {
     if (!f.drive) {
       try {
         const blob = await pegarBlob(f.asset);
-        let arq;
-        try { arq = await enviarArquivo(blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg'); }
-        catch (e) {
-          if (!e || e.code !== 'grande') throw e;
-          const menor = await reduzir(blob, 1200, 0.7);
-          arq = await enviarArquivo(menor.blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg');
-        }
+        const arq = await enviarArquivo(blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg');
         f.drive = arq.id;
         markDirty();
       } catch (e) {
@@ -807,7 +880,7 @@ function promptLote(v, work, n, fotos, texto, parte, de, comImagens) {
   linhas.push('',
     'O que fazer:',
     '1. Ligue cada foto ao cômodo e ao item que ela mostra, usando a fala e o que se vê na imagem.',
-    '2. Registre cada item citado na fala ou claramente visível nas fotos, com estado e descrição em português formal de laudo de vistoria: terceira pessoa, frases objetivas, material, cor, quantidade e defeitos quando houver. Não invente defeitos nem detalhes que não foram ditos ou não se veem com clareza.',
+    '2. Registre cada item citado na fala ou claramente visível nas fotos, com estado e descrição em português formal de laudo de vistoria: terceira pessoa, frases objetivas, material, cor, quantidade e defeitos quando houver. Não invente defeitos nem detalhes que não foram ditos ou não se veem com clareza. Escreva como constatação do laudo: não use expressões como "conforme relato do vistoriador", "segundo o vistoriador" ou "não informado". Se faltar uma informação importante, não escreva isso na descrição: faça a pergunta em "duvidas".',
     '3. Se o item já está no relatório, devolva a descrição completa, unindo o texto anterior com a informação nova, sem perder nada do que já estava escrito. Vale o mesmo para as observações do cômodo.',
     '4. Se o cômodo já existe no relatório, use exatamente o mesmo nome. Para cômodos novos use nomes padrão como Sala, Cozinha, Quarto 1, Quarto 2, Banheiro social, Banheiro da suíte, Área de serviço, Varanda, Garagem, Área externa.',
     '5. Leituras de medidores (água, luz, gás) e chaves entregues vão no cômodo "Medidores e chaves".',
@@ -932,7 +1005,7 @@ async function escreverParecer(v, signal) {
   linhas.push('',
     `Escreva as "Considerações finais" do laudo de vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'} realizada em ${dataLonga(v.data)}.`,
     'Um parágrafo de três a cinco frases, em português formal: estado geral do imóvel, os principais pontos de atenção e, na saída, o resultado da comparação com a entrada.',
-    'Sem prometer nada, sem juízo jurídico, sem travessão, sem markdown, sem título. Responda só com o parágrafo.',
+    'Sem prometer nada, sem juízo jurídico, sem travessão, sem markdown, sem título, e sem expressões como "conforme relato do vistoriador". Responda só com o parágrafo.',
     '', 'Relatório (JSON):', relatorioJSON(v.comodos, false),
     '', 'Pontos de atenção:', criticos.length ? criticos.join('\n') : 'Nenhum item marcado como crítico.');
   if (v.comparacao && v.comparacao.resumo) linhas.push('', 'Resumo da comparação com a entrada:', v.comparacao.resumo);
@@ -1012,7 +1085,7 @@ async function processarLote() {
   const pDrive = enviarFotosDrive(v, fotos, (r) => setPasso('drive', 'run', `${r.ok} de ${r.total}`), ctl.signal).then((r) => {
     const falhou = r.erro && r.ok < r.total;
     setPasso('drive', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)}` : `${r.ok} de ${r.total} na pasta Imagens`);
-    if (falhou) S.avisos['drive-' + v.id] = erroDrive(r.erro);
+    if (falhou) { S.avisos['drive-' + v.id] = erroDrive(r.erro); S.avisoFotos = { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) }; }
     return r;
   });
   let org = null, erro = null;
@@ -1197,7 +1270,8 @@ async function finalizar() {
       setPasso('fotos', 'run');
       const r = await enviarFotosDrive(v, faltam, (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`));
       const falhou = r.erro && r.ok < r.total;
-      setPasso('fotos', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)}` : `${r.ok} de ${r.total}`);
+      setPasso('fotos', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)} Detalhe: ${detalheErro(r.erro)}` : `${r.ok} de ${r.total}`);
+      if (falhou) S.avisoFotos = { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) };
     } else setPasso('fotos', 'skip', 'sem Drive');
   }
   let blob;
@@ -1295,7 +1369,7 @@ async function revisorClaude(v, signal) {
     '1. Nomes de cômodos no padrão: Sala, Cozinha, Quarto 1, Quarto 2, Banheiro social, Banheiro da suíte, Área de serviço, Varanda, Garagem, Área externa, Medidores e chaves. A mesma coisa não pode aparecer com dois nomes.',
     '2. Nomes de itens iguais em todos os cômodos: Piso, Paredes, Teto, Portas, Janelas, Tomadas e interruptores, Iluminação, Bancada, Pia, Torneira, Armários, Box, Vaso sanitário, Chuveiro, e assim por diante.',
     '3. O estado precisa combinar com a descrição. Descrição com vazamento, trinca, infiltração, mofo ou quebra não pode estar como "bom" ou "novo".',
-    '4. Português formal de laudo: terceira pessoa, frases objetivas, ortografia correta, sem gírias, sem primeira pessoa, sem opinião, preço ou promessa.',
+    '4. Português formal de laudo: terceira pessoa, frases objetivas, ortografia correta, sem gírias, sem primeira pessoa, sem opinião, preço ou promessa. Tire expressões como "conforme relato do vistoriador", "segundo o vistoriador" e "não informado".',
     '5. "critico" deve ser true quando houver dano, vazamento, infiltração, mofo, quebra ou item faltando, e false nos outros casos.',
     'Não invente informação. Se a descrição for curta, não complete com detalhes inventados: deixe como está.',
     '', 'Relatório (JSON):', relatorioJSON(v.comodos, false),
@@ -1423,19 +1497,28 @@ function viewVerif() {
 }
 
 /* ---------- identidade visual ---------- */
-function viewPrevia() {
-  const c = S.cfg;
-  const capa = corCfg('corCapa'), corP = corCfg('corPrincipal');
-  const clara = lum(rgbDe(capa)) > 0.45;
-  const tit = tintaSobre(capa);
-  const ac = clara ? corParaFundoClaro(corP) : corParaFundoEscuro(corP);
-  const sub = hexDe(misturar(rgbDe(tit), rgbDe(capa), 0.35));
+function miniCapa(estilo) {
+  const c = S.cfg, k = capaCores(estilo);
   const logo = c.logoAsset ? fotoUrl(c.logoAsset) : '';
-  const marca = [c.empresa || 'Nome da imobiliária', c.creci].filter((x) => String(x || '').trim()).join('  ').toUpperCase();
-  return `<div class="previa" id="previa" style="background:${capa};color:${tit}" role="img" aria-label="Exemplo da capa do laudo">
-    <div class="previa-tx"><span class="previa-k" style="color:${ac}"><i style="background:${ac}"></i>${esc(marca)}</span><b>Laudo de vistoria de entrada</b><span style="color:${sub}">Rua Exemplo, 100, Centro</span></div>
-    ${logo ? `<img src="${esc(logo)}" alt="Logo da empresa">` : ''}
-  </div>`;
+  const marca = [c.empresa || 'Nome da imobiliária', creciFmt(c.creci)].filter((x) => String(x || '').trim()).join('  ').toUpperCase();
+  const on = estiloCapa() === estilo;
+  return `<button type="button" class="capa-op${on ? ' on' : ''}" data-act="estilo" data-val="${estilo}" aria-pressed="${on}" ${S.souDono ? '' : 'disabled'}>
+    <span class="previa" style="background:${k.fundo};color:${k.tit};${k.regua ? `box-shadow:inset 0 -4px 0 ${k.regua};` : ''}">
+      <span class="previa-tx"><span class="previa-k" style="color:${k.ac}"><i style="background:${k.ac}"></i>${esc(marca)}</span><b>Laudo de vistoria</b><span style="color:${k.sub}">Rua Exemplo, 100, Centro</span></span>
+      ${logo ? `<img src="${esc(logo)}" alt="">` : ''}
+    </span>
+    <span class="capa-rot">${estilo === 'clara' ? 'Capa clara' : 'Capa escura'}${on ? ' · em uso' : ''}</span>
+  </button>`;
+}
+function viewPrevia() {
+  return `<div class="capas" id="previa" role="group" aria-label="Escolha a capa do laudo">${miniCapa('clara')}${miniCapa('escura')}</div>`;
+}
+function viewLogoFundo() {
+  const c = S.cfg;
+  if (!c.logoAsset || !c.logoAlternativa) return '';
+  return c.logoSemFundo
+    ? '<div class="msg ok"><p>Tirei o fundo da logo para ela combinar com a capa.</p><div class="row"><button type="button" class="btn ghost sm" data-act="logo-versao">Usar a logo com o fundo original</button></div></div>'
+    : '<div class="msg"><p>Você está usando a logo com o fundo original.</p><div class="row"><button type="button" class="btn ghost sm" data-act="logo-versao">Tirar o fundo da logo</button></div></div>';
 }
 function atualizarPrevia() { const el = document.getElementById('previa'); if (el) el.outerHTML = viewPrevia(); }
 function viewIdentidade() {
@@ -1444,18 +1527,19 @@ function viewIdentidade() {
     <h3>Identidade visual</h3>
     <p class="hint">A logo e as cores aparecem no topo do app e na capa do laudo em PDF. O resto do laudo fica em fundo branco, para imprimir e assinar.</p>
     ${viewPrevia()}
-    <p class="hint">Acima, um exemplo de como fica a capa do laudo.</p>
+    <p class="hint">Acima, as duas capas possíveis para o laudo. Toque na que preferir.</p>
     <fieldset class="fs" ${dono ? '' : 'disabled'}>
       <div class="field"><span class="label">Logo da empresa</span>
         <div class="row">
           <label class="btn sm">${c.logoAsset ? 'Trocar a logo' : 'Escolher a logo'}<input class="vh" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo></label>
           ${c.logoAsset ? '<button type="button" class="btn ghost sm" data-act="tirar-logo">Tirar a logo</button>' : ''}
         </div>
-        <p class="hint">O melhor é um arquivo PNG com fundo transparente. A logo fica em cima da cor da capa: se a capa for escura, use a versão clara da logo; se a capa for clara, a versão escura.</p></div>
+        <p class="hint">Pode ser PNG ou JPG. Se a logo tiver fundo branco, o app tira o fundo sozinho e sugere a capa que combina com ela.</p>
+        ${viewLogoFundo()}</div>
       ${viewCombos()}
       <div class="grid2">
         <div class="field"><label for="c-corp">Cor principal</label><input type="color" id="c-corp" data-cor="corPrincipal" value="${esc(corCfg('corPrincipal'))}"><p class="hint">Botões, títulos e destaques. Costuma ser a cor mais forte da logo.</p></div>
-        <div class="field"><label for="c-corc">Cor da capa do laudo</label><input type="color" id="c-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Fundo da faixa no topo do PDF e do app. Cores escuras costumam ficar mais elegantes.</p></div>
+        <div class="field"><label for="c-corc">Cor da capa escura</label><input type="color" id="c-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Usada quando a capa escura está escolhida.</p></div>
       </div>
     </fieldset>
     ${dono ? '' : '<p class="hint">Só o dono do app muda a identidade visual.</p>'}
@@ -1465,6 +1549,64 @@ function avisoEmpresa() {
   if (!S.pronto || !S.db || String(S.cfg.empresa || '').trim()) return '';
   if (!S.souDono) return aviso('O dono do app ainda não configurou os dados da empresa.');
   return '<div class="msg warn"><p>Falta configurar a empresa: nome, cidade e identidade visual. Eles aparecem nos laudos.</p><div class="row"><button class="btn sm" data-act="config">Configurar agora</button></div></div>';
+}
+/* Prepara a logo: tira o fundo claro e uniforme (comum em JPG), recorta as sobras e mede se a arte é clara ou escura. */
+async function prepararLogo(blob) {
+  const cv = await logoCanvas(blob, 1200);
+  const W = cv.width, H = cv.height;
+  const ctx = cv.getContext('2d');
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  const borda = [];
+  for (let x = 0; x < W; x++) { borda.push(x, (H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { borda.push(y * W, y * W + W - 1); }
+  const opacos = borda.filter((q) => d[q * 4 + 3] > 240);
+  let fundoClaro = false, removido = false;
+  if (opacos.length > borda.length * 0.9) {
+    let r = 0, g = 0, b = 0;
+    for (const q of opacos) { r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; }
+    r /= opacos.length; g /= opacos.length; b /= opacos.length;
+    const parecidos = opacos.filter((q) => Math.hypot(d[q * 4] - r, d[q * 4 + 1] - g, d[q * 4 + 2] - b) < 36).length;
+    if (parecidos > opacos.length * 0.85 && lum([r, g, b]) > 0.72) {
+      fundoClaro = true;
+      const vis = new Uint8Array(W * H), fila = new Int32Array(W * H);
+      let ini = 0, fim = 0;
+      for (const q of borda) if (!vis[q]) { vis[q] = 1; fila[fim++] = q; }
+      while (ini < fim) {
+        const q = fila[ini++], k = q * 4;
+        const dist = Math.hypot(d[k] - r, d[k + 1] - g, d[k + 2] - b);
+        if (d[k + 3] < 10 || dist < 60) {
+          d[k + 3] = dist < 38 ? 0 : Math.min(d[k + 3], Math.round(((dist - 38) / 22) * 255));
+          const x = q % W, y = (q - x) / W;
+          if (x > 0 && !vis[q - 1]) { vis[q - 1] = 1; fila[fim++] = q - 1; }
+          if (x < W - 1 && !vis[q + 1]) { vis[q + 1] = 1; fila[fim++] = q + 1; }
+          if (y > 0 && !vis[q - W]) { vis[q - W] = 1; fila[fim++] = q - W; }
+          if (y < H - 1 && !vis[q + W]) { vis[q + W] = 1; fila[fim++] = q + W; }
+        }
+      }
+      removido = true;
+    }
+  }
+  let minX = W, minY = H, maxX = -1, maxY = -1, soma = 0, n = 0;
+  for (let q = 0; q < W * H; q++) {
+    const k = q * 4;
+    if (d[k + 3] > 16) { const x = q % W, y = (q - x) / W; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    if (d[k + 3] > 128 && (q & 3) === 0) { soma += lum([d[k], d[k + 1], d[k + 2]]); n++; }
+  }
+  const tomLum = n ? soma / n : 0.5;
+  const tom = tomLum < 0.3 ? 'escura' : tomLum > 0.6 ? 'clara' : 'media';
+  let limpa = null;
+  if (removido && maxX > minX && maxY > minY) {
+    ctx.putImageData(img, 0, 0);
+    const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03);
+    const x0 = Math.max(0, minX - pad), y0 = Math.max(0, minY - pad);
+    const x1 = Math.min(W, maxX + pad + 1), y1 = Math.min(H, maxY + pad + 1);
+    const cv2 = document.createElement('canvas'); cv2.width = x1 - x0; cv2.height = y1 - y0;
+    cv2.getContext('2d').drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
+    limpa = await new Promise((res) => cv2.toBlob(res, 'image/png'));
+  }
+  const estilo = tom === 'clara' ? 'escura' : (fundoClaro || tom === 'escura') ? 'clara' : 'escura';
+  return { limpa, tom, fundoClaro, estilo };
 }
 async function trocarLogo(file) {
   if (!S.souDono) return;
@@ -1477,28 +1619,47 @@ async function trocarLogo(file) {
       blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
       tipo = 'image/png';
     }
+    let prep = null;
+    if (tipo !== 'image/svg+xml') { try { prep = await prepararLogo(blob); } catch (_) { prep = null; } }
+    const antigos = [S.cfg.logoAsset, S.cfg.logoAlternativa].filter(Boolean);
     const up = await S.assets.upload(blob, { type: tipo });
-    const antigo = S.cfg.logoAsset;
     S.blobs.set(up.id, blob);
-    S.cfg.logoAsset = up.id;
-    try { S.coresSugeridas = await sugerirCores(blob); } catch (_) { S.coresSugeridas = null; }
-    if (S.tela === 'inicio' && S.coresSugeridas && S.coresSugeridas[0]) {
-      S.cfg.corPrincipal = S.coresSugeridas[0].principal; S.cfg.corCapa = S.coresSugeridas[0].capa; aplicarTema();
+    let usar = up.id, alternativa = '';
+    if (prep && prep.limpa) {
+      const upL = await S.assets.upload(prep.limpa, { type: 'image/png' });
+      S.blobs.set(upL.id, prep.limpa);
+      usar = upL.id; alternativa = up.id;
     }
+    S.cfg.logoAsset = usar; S.cfg.logoAlternativa = alternativa; S.cfg.logoSemFundo = !!alternativa;
+    if (prep) S.cfg.estiloCapa = prep.estilo;
+    try { S.coresSugeridas = await sugerirCores(prep && prep.limpa ? prep.limpa : blob); } catch (_) { S.coresSugeridas = null; }
+    if (S.tela === 'inicio' && S.coresSugeridas && S.coresSugeridas[0]) {
+      S.cfg.corPrincipal = S.coresSugeridas[0].principal; S.cfg.corCapa = S.coresSugeridas[0].capa;
+    }
+    aplicarTema();
     await salvarCfg(true);
-    if (antigo && antigo !== up.id) { try { await S.assets.delete(antigo); } catch (_) {} }
+    for (const a of antigos) { if (a !== usar && a !== alternativa) { try { await S.assets.delete(a); } catch (_) {} } }
     render();
-    toast('Logo salva. Ela já aparece no app e vai na capa dos próximos laudos.');
+    toast(alternativa ? 'Logo salva. Tirei o fundo branco e escolhi a capa que combina com ela.' : 'Logo salva. Ela já aparece no app e vai na capa dos próximos laudos.');
   } catch (e) { toast('Não consegui salvar a logo: ' + erroFoto(e)); }
 }
 async function tirarLogo() {
   if (!S.souDono || !S.cfg.logoAsset) return;
-  const antigo = S.cfg.logoAsset;
-  S.cfg.logoAsset = '';
+  const antigos = [S.cfg.logoAsset, S.cfg.logoAlternativa].filter(Boolean);
+  S.cfg.logoAsset = ''; S.cfg.logoAlternativa = ''; S.cfg.logoSemFundo = false;
+  aplicarTema();
   await salvarCfg(true);
-  if (S.assets) { try { await S.assets.delete(antigo); } catch (_) {} }
+  if (S.assets) for (const a of antigos) { try { await S.assets.delete(a); } catch (_) {} }
   render();
   toast('Logo retirada.');
+}
+function trocarVersaoLogo() {
+  const c = S.cfg;
+  if (!S.souDono || !c.logoAsset || !c.logoAlternativa) return;
+  const atual = c.logoAsset;
+  c.logoAsset = c.logoAlternativa; c.logoAlternativa = atual; c.logoSemFundo = !c.logoSemFundo;
+  salvarCfg(true);
+  render();
 }
 
 /* ---------- cores sugeridas pela logo ---------- */
@@ -1568,11 +1729,12 @@ function viewInicio() {
         <label class="btn">${c.logoAsset ? 'Trocar a logo' : 'Escolher a logo'}<input class="vh" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo></label>
         ${c.logoAsset ? '<button type="button" class="btn ghost sm" data-act="tirar-logo">Tirar a logo</button>' : ''}
       </div>
-      <p class="hint">Pode ser uma foto ou imagem da galeria do celular. O ideal é PNG com fundo transparente. Ao escolher, o app sugere as cores a partir da logo.</p>
+      <p class="hint">Pode ser uma imagem da galeria do celular, em PNG ou JPG. Se ela tiver fundo branco, o app tira o fundo sozinho, sugere as cores e escolhe a capa que combina. Toque numa das capas acima para trocar.</p>
+      ${viewLogoFundo()}
       ${viewCombos()}
       <div class="grid2">
         <div class="field"><label for="w-corp">Cor principal</label><input type="color" id="w-corp" data-cor="corPrincipal" value="${esc(corCfg('corPrincipal'))}"><p class="hint">Botões e destaques.</p></div>
-        <div class="field"><label for="w-corc">Cor da capa do laudo</label><input type="color" id="w-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Fundo da faixa da capa. A logo precisa aparecer bem em cima dela.</p></div>
+        <div class="field"><label for="w-corc">Cor da capa escura</label><input type="color" id="w-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Usada quando a capa escura está escolhida.</p></div>
       </div>
     </section>
     <section class="card">
@@ -1638,6 +1800,8 @@ async function gerarPDF(v, progresso, pronto) {
     tituloCapa, subCapa: misturar(tituloCapa, rgbDe(corC), 0.35),
     tinta: [22, 30, 38], cinza: [96, 106, 117], linha: [218, 224, 230], fundo: [242, 245, 248],
   };
+  const estilo = estiloCapa(), kc = capaCores(estilo);
+  C.capa = rgbDe(kc.fundo); C.acentoCapa = rgbDe(kc.ac); C.tituloCapa = rgbDe(kc.tit); C.subCapa = rgbDe(kc.sub);
   const COR_EST = { novo: [19, 128, 86], bom: [19, 128, 86], regular: [176, 112, 18], ruim: [190, 72, 40], nao_se_aplica: [120, 132, 125], '': [120, 132, 125] };
   const T = pdfTexto;
   const tipoNome = v.tipo === 'saida' ? 'saída' : 'entrada';
@@ -1705,7 +1869,7 @@ async function gerarPDF(v, progresso, pronto) {
   progresso && progresso('pdf', '');
 
   function grade(codes) {
-    const cols = 3, gap = 4, cw = (CW - gap * (cols - 1)) / cols, ih = cw * 0.75, alt = ih + 9;
+    const cols = 2, gap = 6, cw = (CW - gap * (cols - 1)) / cols, ih = cw * 0.75, alt = ih + 10;
     for (let i = 0; i < codes.length; i += cols) {
       espaco(alt);
       for (let j = 0; j < cols && i + j < codes.length; j++) {
@@ -1728,7 +1892,8 @@ async function gerarPDF(v, progresso, pronto) {
 
   /* capa */
   doc.setFillColor(...C.capa); doc.rect(0, 0, W, 58, 'F');
-  const marca = [cfg.empresa, cfg.creci].filter((s) => String(s || '').trim()).join('  ');
+  if (estilo === 'clara') { doc.setFillColor(...C.acento); doc.rect(0, 57, W, 1.2, 'F'); }
+  const marca = [cfg.empresa, creciFmt(cfg.creci)].filter((s) => String(s || '').trim()).join('  ');
   if (marca) {
     doc.setDrawColor(...C.acentoCapa); doc.setLineWidth(0.7); doc.line(M, 17, M + 10, 17);
     fonte('bold', 8, C.acentoCapa);
@@ -1867,7 +2032,7 @@ async function gerarPDF(v, progresso, pronto) {
     doc.setPage(p);
     doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, H - 12.5, W - M, H - 12.5);
     fonte('normal', 7.5, C.cinza);
-    const rod = [cfg.empresa, cfg.creci, cfg.contato].filter((s) => String(s || '').trim()).join('  |  ');
+    const rod = [cfg.empresa, creciFmt(cfg.creci), cfg.contato].filter((s) => String(s || '').trim()).join('  |  ');
     doc.text(T(rod), M, H - 8.5);
     doc.text(`Página ${p} de ${total}`, W - M, H - 8.5, { align: 'right' });
   }
@@ -1992,7 +2157,8 @@ function viewDados() {
     <p class="kicker"><span class="rule"></span>Fase 1 · Dados do imóvel</p>
     <h2>${v._novo ? 'Boas-vindas. Para começar, preciso de três dados.' : 'Dados da vistoria'}</h2>
     <div class="field"><label for="f-end">Endereço completo do imóvel</label>
-      <input id="f-end" data-bind="endereco" value="${esc(v.endereco)}" placeholder="Rua, número, apartamento, bairro, cidade" autocomplete="off"></div>
+      <input id="f-end" data-bind="endereco" value="${esc(v.endereco)}" placeholder="Rua, número, apartamento, bairro, cidade" autocomplete="off">
+      <p class="hint">Com número, complemento, bairro e cidade. Ex.: Av. Castelo Branco, 1104, apto 301, Centro, Viçosa - MG.</p></div>
     <div class="field"><label for="f-desc">Descrição breve</label>
       <input id="f-desc" data-bind="descricao" value="${esc(v.descricao)}" placeholder="Ex.: Apartamento 3 quartos, desocupado" autocomplete="off"></div>
     <div class="grid2">
@@ -2066,7 +2232,7 @@ function viewResultado() {
   const u = S.ultimo;
   if (!u || u.vid !== S.v.id) return '';
   const d = u.drive;
-  const driveTxt = !u.lote.fotos.length ? '' : d && d.erro && d.ok < d.total ? `<div class="msg warn"><p>Drive: ${d.ok} de ${d.total} fotos enviadas. ${esc(erroDrive(d.erro))} As que faltaram vão no fim, junto com o laudo.</p></div>` : `<p class="hint">Drive: ${plural(d ? d.ok : 0, 'foto enviada', 'fotos enviadas')} para a pasta Imagens.</p>`;
+  const driveTxt = !u.lote.fotos.length ? '' : d && d.erro && d.ok < d.total ? `<div class="msg warn"><p>Drive: ${d.ok} de ${d.total} fotos enviadas. ${esc(erroDrive(d.erro))}</p><p class="hint">Detalhe técnico, para mandar ao suporte: ${esc(detalheErro(d.erro))}</p><div class="row"><button class="btn sm" data-act="reenviar-fotos">Reenviar fotos ao Drive</button></div></div>` : `<p class="hint">Drive: ${plural(d ? d.ok : 0, 'foto enviada', 'fotos enviadas')} para a pasta Imagens.</p>`;
   return `<section class="card">
     <p class="kicker"><span class="rule"></span>Lote ${u.lote.n} processado</p>
     <h2>Lote processado com sucesso.</h2>
@@ -2099,6 +2265,7 @@ function viewLotes() {
   const semClaude = !S.sample ? aviso('O Claude não está disponível nesta tela. O lote vai ser guardado sem organização automática e você organiza os itens na revisão.') : '';
   const primeira = !v.lotes.length && v.drive && v.drive.pasta && !S.criandoPasta ? `<p class="lede">Estrutura criada. Pode enviar o primeiro lote.</p>` : '';
   return `${viewDriveLinha(v)}
+    ${v.lotes.length && !resultado ? viewFotosDrive(v) : ''}
     ${resultado}
     ${mostrarForm ? `<section class="card">
       <p class="kicker"><span class="rule"></span>Fase 2 · Lote ${n}</p>
@@ -2246,6 +2413,7 @@ function viewLaudo() {
     <p class="lede">O laudo de vistoria de ${tipo} do imóvel situado em ${esc(v.endereco)}, realizada em ${esc(dataLonga(v.data))}, foi gerado${v.drive && v.drive.pdf ? ` e arquivado na pasta desta vistoria no Google Drive, junto com ${plural(v.fotos.length, 'foto original', 'fotos originais')}` : ''}.</p>
     <p class="lede">Imprima o laudo para a assinatura do locador e do locatário, ou envie o PDF para assinatura digital. Agradecemos o trabalho em campo.</p>
     ${S.laudoAviso ? aviso(S.laudoAviso) : ''}
+    ${viewFotosDrive(v)}
     <div class="links">
       ${pastaUrl ? `<a class="btn primary block" href="${esc(pastaUrl)}" target="_blank" rel="noopener">Abrir a pasta no Google Drive</a>` : ''}
       ${v.drive && v.drive.pdfUrl ? `<a class="btn block" href="${esc(v.drive.pdfUrl)}" target="_blank" rel="noopener">Abrir o PDF no Drive</a>` : ''}
@@ -2431,6 +2599,9 @@ app.addEventListener('click', async (ev) => {
     case 'rev-sem': return aplicarRevisao(false);
     case 'rev-voltar': S.revisao = null; render(); window.scrollTo(0, 0); return;
     case 'verificar': return verificarConexoes();
+    case 'reenviar-fotos': return reenviarFotos();
+    case 'estilo': if (S.souDono) { S.cfg.estiloCapa = b.dataset.val; aplicarTema(); salvarCfg(true); render(); } return;
+    case 'logo-versao': return trocarVersaoLogo();
     case 'concluir-inicio': return concluirInicio();
     case 'comecar': S.tela = 'home'; S.verif = null; render(); window.scrollTo(0, 0); return;
     case 'combo': return aplicarCombo(+b.dataset.i);
