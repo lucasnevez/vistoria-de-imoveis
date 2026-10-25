@@ -1,0 +1,2580 @@
+<title>Vistoria de Imóveis</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap">
+<style>
+/* Layout: uma coluna de campo (celular primeiro), barra fixa no topo, fases em sequência. As cores da marca vêm das Configurações de cada imobiliária (aplicarTema). */
+:root {
+  color-scheme: dark;
+  --ink: #07090C;
+  --deep: #111821;
+  --panel: rgba(18, 25, 34, 0.88);
+  --panel-solid: #121922;
+  --field: #0B1016;
+  --line: #243140;
+  --line-2: #344558;
+  --fg: #F3F6F9;
+  --muted: #8F9BA8;
+  --stroke: #DCE3EA;
+  --accent: #4C9AFF;
+  --accent-ink: #06111F;
+  --capa: #14202B;
+  --ok: #6FD39B;
+  --warn: #E9AB2B;
+  --bad: #E67D58;
+  --grad: radial-gradient(130% 90% at 20% 0%, #1C2A38 0%, #121A24 40%, #0B1016 75%, #07090C 100%);
+  --font: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --r: 3px;
+  --fs-xs: 0.75rem;
+  --fs-s: 0.875rem;
+  --fs-m: 1rem;
+  --fs-l: 1.25rem;
+  --fs-xl: 1.625rem;
+}
+html { background: var(--ink); }
+body {
+  min-height: 100vh;
+  background: var(--grad) no-repeat fixed, var(--ink);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--deep); }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(11, 16, 22, 0.94); border-bottom: 1px solid var(--line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.top-in { max-width: 760px; margin: 0 auto; min-height: 56px; display: flex; align-items: center; gap: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-stretch: 112%; letter-spacing: 0.01em; font-size: var(--fs-m); min-width: 0; }
+.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand .logo { display: block; width: auto; max-width: 110px; object-fit: contain; flex: none; box-sizing: content-box; padding: 3px 6px; background: var(--capa); border-radius: 2px; }
+.save { margin-left: auto; font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.save.is-bad { color: var(--bad); }
+.icon-btn { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; color: var(--stroke); }
+.icon-btn:hover { border-color: var(--line-2); }
+.top-in .icon-btn:last-child { margin-left: 0; }
+.save:empty + .icon-btn { margin-left: auto; }
+
+.shell { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 96px; display: flex; flex-direction: column; gap: 16px; }
+
+.kicker { display: flex; align-items: center; gap: 10px; margin: 0; font-size: var(--fs-xs); font-weight: 700; font-stretch: 115%; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.kicker .rule { width: 26px; height: 2px; background: var(--accent); flex: none; }
+.kicker.quiet { color: var(--muted); }
+.kicker.quiet .rule { background: var(--line-2); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 7vw, 2.6rem); font-weight: 800; font-stretch: 110%; line-height: 1.04; letter-spacing: -0.01em; }
+h1 em { font-style: normal; color: var(--accent); }
+h2 { font-size: var(--fs-xl); font-weight: 800; font-stretch: 106%; line-height: 1.12; }
+h3 { font-size: var(--fs-l); font-weight: 700; line-height: 1.2; }
+p { margin: 0; }
+.lede { color: var(--stroke); max-width: 60ch; }
+.muted { color: var(--muted); }
+.hint { color: var(--muted); font-size: var(--fs-s); }
+.label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.hero { display: flex; flex-direction: column; gap: 14px; padding-block: 8px 4px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card.flat { background: transparent; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 460px) { .row2 { grid-template-columns: 1fr; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 10px 16px; border-radius: var(--r); border: 1px solid var(--line-2); background: transparent; color: var(--fg); font-weight: 700; font-size: 0.95rem; cursor: pointer; text-decoration: none; text-align: center; }
+.btn:hover { border-color: var(--stroke); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.block { width: 100%; }
+.btn.sm { min-height: 36px; padding: 6px 12px; font-size: var(--fs-s); }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--fg); border-color: var(--line); }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn svg { flex: none; }
+
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label, .field > .label { font-size: var(--fs-s); font-weight: 600; color: var(--stroke); letter-spacing: 0; text-transform: none; }
+input[type="text"], input[type="date"], input:not([type]), select, textarea {
+  width: 100%; min-width: 0; background: var(--field); border: 1px solid var(--line-2); border-radius: var(--r); padding: 11px 12px; font-size: 16px; color: var(--fg);
+}
+textarea { resize: vertical; line-height: 1.45; }
+input::placeholder, textarea::placeholder { color: #5E6B78; }
+input[type="color"] { width: 100%; height: 46px; padding: 4px; background: var(--field); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+details.more { border-top: 1px solid var(--line); padding-top: 14px; }
+details.more > summary { cursor: pointer; font-weight: 700; color: var(--stroke); list-style: none; display: flex; align-items: center; gap: 8px; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "+"; display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line-2); border-radius: var(--r); font-size: 14px; color: var(--accent); }
+details.more[open] > summary::before { content: "\2212"; }
+details.more > .stack { margin-top: 14px; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; }
+.seg button { min-height: 46px; background: transparent; border: 0; cursor: pointer; font-weight: 700; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line-2); }
+.seg button[aria-checked="true"] { background: rgba(14, 186, 157, 0.14); color: var(--fg); box-shadow: inset 0 -3px 0 var(--accent); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+.steps button { width: 100%; background: transparent; border: 0; padding: 10px 2px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; cursor: pointer; color: var(--muted); text-align: left; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.steps button:disabled { cursor: default; opacity: 0.5; }
+.steps .n { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.1em; font-variant-numeric: tabular-nums; }
+.steps .t { font-weight: 700; font-size: var(--fs-s); color: inherit; }
+.steps .is-done { color: var(--stroke); }
+.steps .is-on { color: var(--fg); border-bottom-color: var(--accent); }
+.steps .is-on .n { color: var(--accent); }
+
+.tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { background: transparent; border: 0; padding: 10px 0 11px; color: var(--muted); font-weight: 700; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs .c { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; margin-left: 4px; }
+
+.vlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.vrow { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; padding: 16px 2px; background: transparent; border: 0; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; color: var(--fg); }
+.vrow:hover { background: rgba(14, 186, 157, 0.05); }
+.vrow .k { grid-column: 1 / -1; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.vrow .t { font-weight: 700; font-size: 1.05rem; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+.vrow .d { color: var(--stroke); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: var(--fs-s); align-self: start; padding-top: 3px; }
+.vrow .m { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-s); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.sq { display: inline-block; width: 9px; height: 9px; flex: none; background: var(--muted); }
+.sq.andamento { background: var(--warn); }
+.sq.revisao { background: var(--accent); }
+.sq.concluida { background: var(--ok); }
+.est-novo, .est-bom { --c: var(--ok); }
+.est-regular { --c: var(--warn); }
+.est-ruim { --c: var(--bad); }
+.est-nao_se_aplica, .est- { --c: var(--muted); }
+.sq[class*="est-"] { background: var(--c); }
+.estado-txt { color: var(--c); font-weight: 700; font-size: var(--fs-s); white-space: nowrap; }
+
+.empty { display: flex; flex-direction: column; gap: 14px; padding: 8px 0; }
+.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: f; border-top: 1px solid var(--line); }
+.phases li { counter-increment: f; display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.phases li::before { content: counter(f, decimal-leading-zero); grid-row: span 2; color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; font-size: var(--fs-s); padding-top: 2px; }
+.phases b { font-weight: 700; }
+.phases span { color: var(--muted); font-size: var(--fs-s); }
+
+.msg { padding: 12px 14px; border-left: 3px solid var(--muted); background: rgba(3, 9, 7, 0.45); font-size: var(--fs-s); color: var(--stroke); display: flex; flex-direction: column; gap: 8px; }
+.msg.ok { border-left-color: var(--ok); }
+.msg.warn { border-left-color: var(--warn); }
+.msg.bad { border-left-color: var(--bad); }
+.msg .row { gap: 8px; }
+
+.photo-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.photo-actions .count { margin-left: auto; font-size: var(--fs-s); color: var(--muted); font-variant-numeric: tabular-nums; }
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+label.btn { position: relative; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.thumbs:empty { display: none; }
+.th { position: relative; margin: 0; aspect-ratio: 1; max-width: 100%; background: var(--field); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.th figcaption { position: absolute; left: 0; bottom: 0; padding: 2px 6px; font-size: 11px; font-weight: 700; background: rgba(3, 9, 7, 0.8); font-variant-numeric: tabular-nums; }
+.th .x { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; display: grid; place-items: center; background: rgba(3, 9, 7, 0.82); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; color: var(--fg); }
+.th.loading { display: grid; place-items: center; }
+.spin { width: 18px; height: 18px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: gira 0.9s linear infinite; flex: none; }
+@keyframes gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+.passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.passos li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.passos .ic { width: 18px; height: 18px; margin-top: 2px; display: grid; place-items: center; }
+.passos .ic.wait { border: 1px solid var(--line-2); }
+.passos .ic.ok { background: var(--ok); color: var(--accent-ink); }
+.passos .ic.err { background: var(--bad); color: var(--accent-ink); }
+.passos .ic.skip { border: 1px dashed var(--line-2); }
+.passos .tx { font-weight: 600; }
+.passos .det { grid-column: 2; color: var(--muted); font-size: var(--fs-s); }
+.passos li.is-wait .tx, .passos li.is-skip .tx { color: var(--muted); }
+
+.changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.changes li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-s); }
+.changes .sq { align-self: center; }
+.changes .nm { min-width: 0; overflow-wrap: anywhere; }
+.changes .nm b { font-weight: 700; }
+.ask { font-size: 1.1rem; font-weight: 700; line-height: 1.35; }
+.bullets { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-s); color: var(--stroke); }
+
+.summary-line { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--fs-s); color: var(--stroke); font-variant-numeric: tabular-nums; }
+.summary-line b { font-size: 1.15rem; font-weight: 800; color: var(--fg); margin-right: 4px; }
+.comodo-head { display: flex; gap: 10px; align-items: center; }
+.comodo-head .btn { white-space: nowrap; flex: none; }
+.comodo-head input { font-weight: 800; font-size: 1.15rem; background: transparent; border-color: transparent; padding-left: 0; }
+.comodo-head input:hover, .comodo-head input:focus { border-color: var(--line-2); padding-left: 10px; }
+.itens { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.item { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 14px 12px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--c, var(--muted)); }
+.item-top { display: grid; grid-template-columns: 1fr minmax(120px, 160px); gap: 8px; }
+@media (max-width: 420px) { .item-top { grid-template-columns: 1fr; } }
+.item-top input { font-weight: 700; }
+.item-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.chk { display: inline-flex; gap: 8px; align-items: center; font-size: var(--fs-s); color: var(--stroke); cursor: pointer; }
+.chk input { width: 18px; height: 18px; accent-color: var(--bad); }
+.mini { display: flex; flex-wrap: wrap; gap: 4px; }
+.mini img, .mini .ph { width: 44px; height: 44px; object-fit: cover; border: 1px solid var(--line); border-radius: var(--r); display: block; background: var(--field); }
+.mini .more-n { width: 44px; height: 44px; display: grid; place-items: center; font-size: var(--fs-xs); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r); }
+.item-foot .btn { margin-left: auto; }
+.cmp { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.cmp-row { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.cmp-row .top-l { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.cmp-row .de-para { font-size: var(--fs-s); color: var(--muted); font-variant-numeric: tabular-nums; }
+.cmp-row .sug { font-size: var(--fs-s); color: var(--stroke); }
+.sit-dano, .sit-faltando { --c: var(--bad); }
+.sit-desgaste_natural, .sit-avaliar { --c: var(--warn); }
+.sit-sem_alteracao, .sit-novo { --c: var(--ok); }
+.cmp-row select { max-width: 240px; border-left: 3px solid var(--c); }
+.loading-line { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: var(--fs-s); padding: 12px 0; }
+.done-mark { display: flex; align-items: center; gap: 12px; }
+.links { display: flex; flex-direction: column; gap: 10px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: min(560px, calc(100% - 32px)); background: var(--panel-solid); border: 1px solid var(--line-2); border-left: 3px solid var(--accent); padding: 12px 14px; font-size: var(--fs-s); display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.toast .grow { flex: 1; min-width: 0; }
+.fs { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.fs:disabled { opacity: 0.6; }
+.lista-def { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.lista-def li { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.lista-def b { font-weight: 700; }
+.lista-def span { color: var(--muted); font-size: var(--fs-s); }
+.hero .row { gap: 12px; }
+.previa { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px; border-radius: var(--r); border: 1px solid var(--line); min-height: 92px; }
+.previa-tx { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.previa-k { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; }
+.previa-k i { width: 16px; height: 2px; display: inline-block; flex: none; }
+.previa b { font-size: 1.15rem; font-weight: 800; }
+.previa-tx span:last-child { font-size: var(--fs-s); }
+.previa img { max-height: 44px; max-width: min(120px, 30%); object-fit: contain; flex: none; }
+.ic-ok { width: 28px; height: 28px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); flex: none; }
+.rev-row { cursor: pointer; }
+.combo { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--line-2); background: transparent; color: var(--fg); border-radius: var(--r); cursor: pointer; font-weight: 600; font-size: var(--fs-s); }
+.combo:hover { border-color: var(--stroke); }
+.combo i { width: 18px; height: 18px; display: block; border: 1px solid rgba(255, 255, 255, 0.25); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<div id="app"><div class="shell"><p class="muted">Carregando o app de vistoria.</p></div></div>
+<div id="toast-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ---------- utilidades ---------- */
+const app = document.getElementById('app');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const pad = (n) => String(n).padStart(2, '0');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function uid() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function partes(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? { a: +m[1], m: +m[2], d: +m[3] } : null; }
+function dataCurta(iso) { const p = partes(iso); return p ? `${pad(p.d)}/${pad(p.m)}/${p.a}` : ''; }
+function dataLonga(iso) { const p = partes(iso); return p ? `${p.d} de ${MESES[p.m - 1]} de ${p.a}` : ''; }
+function dataPasta(iso) { const p = partes(iso); return p ? `${pad(p.d)}-${pad(p.m)}-${p.a}` : ''; }
+function codigo(l, f) { return `L${pad(l)}-F${pad(f)}`; }
+function codigoCanon(s) { const m = /L\s*0*(\d+)\s*[-_ ]?\s*F\s*0*(\d+)/i.exec(String(s || '')); return m ? codigo(+m[1], +m[2]) : null; }
+function listaPt(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1]; }
+function tamanho(b) { return b > 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+function plural(n, um, varios) { return `${n} ${n === 1 ? um : varios}`; }
+
+/* ---------- constantes ---------- */
+const ESTADOS = [['novo', 'Novo'], ['bom', 'Bom'], ['regular', 'Regular'], ['ruim', 'Ruim'], ['nao_se_aplica', 'Não se aplica']];
+const ESTADO_OK = new Set(ESTADOS.map((e) => e[0]));
+const estadoLabel = (e) => (ESTADOS.find((x) => x[0] === e) || [null, 'Sem estado'])[1];
+const SITUACOES = [['dano', 'Dano'], ['faltando', 'Item faltando'], ['desgaste_natural', 'Desgaste natural'], ['avaliar', 'A avaliar'], ['novo', 'Item novo'], ['sem_alteracao', 'Sem alteração']];
+const SIT_OK = new Set(SITUACOES.map((s) => s[0]));
+const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'])[1];
+const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
+const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
+const MAX_FOTOS = 20;
+const DRIVE = 'Google Drive';
+const FOLDER = 'application/vnd.google-apps.folder';
+function nomeRaizPadrao() { return 'Vistorias - ' + (String(S.cfg.empresa || '').trim() || 'Imobiliária'); }
+function nomeRaiz() { return String(S.cfg.driveRaizNome || '').trim() || nomeRaizPadrao(); }
+const MSG_SEM_FALA = 'Recebi as fotos, mas preciso da descrição falada deste lote para continuar. Toque no microfone do teclado e conte o que você fotografou.';
+const CFG_PADRAO = {
+  empresa: '',
+  creci: '',
+  cidade: '',
+  contato: '',
+  corPrincipal: '#4C9AFF',
+  corCapa: '#14202B',
+  logoAsset: '',
+  declaracaoEntrada: 'As partes declaram que acompanharam ou tiveram acesso a esta vistoria e que este laudo, com as fotos que o acompanham, retrata o estado do imóvel na data indicada, no momento da entrega ao locatário. O locatário se compromete a devolver o imóvel nas mesmas condições, ressalvado o desgaste natural pelo uso normal. Divergências devem ser comunicadas por escrito à imobiliária no prazo previsto no contrato de locação.',
+  declaracaoSaida: 'As partes declaram que acompanharam ou tiveram acesso a esta vistoria de saída e que este laudo, com as fotos e o comparativo com a vistoria de entrada, retrata o estado do imóvel na data da devolução. Os itens apontados como dano ou falta serão tratados conforme o contrato de locação.',
+  driveRaizId: '',
+  driveRaizUrl: '',
+  driveRaizNome: '',
+};
+
+const IC = {
+  back: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  gear: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  cam: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  img: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/></svg>',
+  x: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  bang: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v9M12 19v.5"/></svg>',
+};
+/* Cores da marca: cada imobiliária escolhe as suas; estas funções garantem leitura no fundo escuro do app e no branco do PDF. */
+function hexOk(h) { return /^#[0-9a-f]{6}$/i.test(String(h || '')); }
+function rgbDe(h) { const n = parseInt(String(h).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function hexDe(rgb) { return '#' + rgb.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join(''); }
+function lum(rgb) { const c = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+function misturar(a, b, t) { return a.map((x, i) => Math.round(x + (b[i] - x) * t)); }
+function corParaFundoEscuro(h) { let c = rgbDe(h); for (let i = 0; i < 12 && lum(c) < 0.22; i++) c = misturar(c, [255, 255, 255], 0.16); return hexDe(c); }
+function corParaFundoClaro(h) { let c = rgbDe(h); for (let i = 0; i < 12 && lum(c) > 0.2; i++) c = misturar(c, [0, 0, 0], 0.14); return hexDe(c); }
+function tintaSobre(h) { return lum(rgbDe(h)) > 0.45 ? '#0B0F14' : '#FFFFFF'; }
+function corCfg(nome) { return hexOk(S.cfg[nome]) ? S.cfg[nome] : CFG_PADRAO[nome]; }
+function aplicarTema() {
+  const r = document.documentElement.style;
+  const ac = corParaFundoEscuro(corCfg('corPrincipal'));
+  r.setProperty('--accent', ac);
+  r.setProperty('--accent-ink', tintaSobre(ac));
+  r.setProperty('--capa', corCfg('corCapa'));
+  let base = rgbDe(corCfg('corCapa'));
+  for (let i = 0; i < 12 && lum(base) > 0.05; i++) base = misturar(base, [0, 0, 0], 0.2);
+  r.setProperty('--grad', `radial-gradient(130% 90% at 20% 0%, ${hexDe(misturar(base, [255, 255, 255], 0.1))} 0%, ${hexDe(base)} 35%, ${hexDe(misturar(base, [0, 0, 0], 0.5))} 70%, ${hexDe(misturar(base, [0, 0, 0], 0.75))} 100%)`);
+}
+function nomeApp() { const e = String(S.cfg.empresa || '').trim(); return e ? `Vistoria ${e}` : 'Vistoria de Imóveis'; }
+function marcaHTML(alt) {
+  const id = S.cfg.logoAsset;
+  if (!id) return '';
+  const u = fotoUrl(id);
+  return u ? `<img class="logo" src="${esc(u)}" alt="" style="height:${alt}px">` : '';
+}
+
+/* ---------- estado ---------- */
+const S = {
+  pronto: false, semRuntime: false,
+  db: null, user: null, sample: null, assets: null, mcp: null, downloads: null, permissions: null,
+  podeEscrever: true, imgMax: 0, fileArgs: false, meuNome: '', meuId: null, souDono: false,
+  cfgOcupado: false, cfgAviso: '', novaPasta: '', nomes: {},
+  verif: null, verificando: false, revisao: null, coresSugeridas: null,
+  lista: [], listaCarregada: false, listaErro: null,
+  cfg: { ...CFG_PADRAO },
+  tela: 'home', filtro: 'todas',
+  v: null, aba: 'dados',
+  blobs: new Map(), urls: new Map(), subindo: 0, carregando: [],
+  busy: null, ultimo: null, pedirProximo: false,
+  msg: null, confirmar: null, correcao: '', desfazer: null,
+  avisos: {}, pdf: null, laudoAviso: '',
+  save: 'idle', saveErr: null,
+};
+
+/* ---------- textos de erro ---------- */
+function erroClaude(e) {
+  switch (e && e.code) {
+    case 'not_granted': return 'O Claude não foi liberado para este app. Abra o app de novo e permita o uso do Claude quando ele perguntar.';
+    case 'sampling_disabled': return 'O Claude não está disponível para esta conta.';
+    case 'rate_limited': return 'Muitos pedidos ao Claude em pouco tempo, ou o limite de uso da sua conta chegou. Espere alguns minutos e tente de novo.';
+    case 'session_expired': return 'Sua sessão no Claude expirou. Entre de novo na conta e tente.';
+    case 'image_rejected': return 'Uma das fotos não pôde ser lida pelo Claude. Tire a foto de novo ou remova essa foto do lote.';
+    case 'images_unavailable': return 'Esta tela não consegue mandar fotos ao Claude. Ele vai trabalhar só com a fala.';
+    case 'refused': return 'O Claude não aceitou este pedido. Reescreva a descrição e tente de novo.';
+    case 'invalid_json': case 'empty_completion': return 'O Claude respondeu fora do formato esperado. Tente de novo.';
+    case 'prompt_too_large': return 'Ficou texto demais para um pedido só. Divida a fala em lotes menores.';
+    case 'upstream_error': return 'A conexão com o Claude caiu no meio do caminho. Tente de novo.';
+    case 'cancelled': return 'Você parou o processamento.';
+    default: return 'Não consegui falar com o Claude agora' + (e && e.code ? ` (${e.code})` : '') + '. Tente de novo.';
+  }
+}
+function erroDrive(e) {
+  switch (e && e.code) {
+    case 'sem_mcp': return 'O Google Drive não está disponível nesta tela. Abra o app pelo claude.ai, com o Google Drive conectado na sua conta.';
+    case 'sem_acesso_pasta': return S.souDono
+      ? 'Não encontrei a pasta das vistorias no seu Drive; ela pode ter sido apagada. Em Configurações, crie a pasta de novo ou indique outra.'
+      : `Você não tem acesso à pasta das vistorias no Google Drive. Peça ao dono do app para compartilhar a pasta "${nomeRaiz()}" com o seu e-mail, como Editor.`;
+    case 'sem_pasta_definida': return 'O dono do app ainda não criou a pasta das vistorias no Google Drive. Peça para ele abrir Configurações e criar a pasta.';
+    case 'server_not_connected': return 'O Google Drive não está conectado na sua conta do Claude. Conecte em claude.ai, Configurações, Conectores, e tente de novo.';
+    case 'needs_reauth': return 'A conexão com o Google Drive expirou. Reconecte em claude.ai, Configurações, Conectores.';
+    case 'selection_required': return 'Há mais de um Google Drive conectado. Escolha qual usar no aviso do Claude e tente de novo.';
+    case 'not_in_manifest': case 'approval_required': return 'O app precisa da sua permissão para usar o Google Drive. Toque em tentar de novo e permita.';
+    case 'blocked_by_policy': return 'A sua organização bloqueou o Google Drive para este app.';
+    case 'server_unavailable': case 'upstream_error': return 'O Google Drive não respondeu agora. Tente de novo em instantes.';
+    case 'tool_error': return 'O Google Drive recusou o pedido' + (e.message ? ': ' + String(e.message).slice(0, 160) : '.');
+    case 'grande': return 'O arquivo ficou grande demais para enviar ao Drive por aqui.';
+    case 'formato': return e.message || 'O Drive respondeu num formato inesperado.';
+    default: return 'Não consegui falar com o Google Drive' + (e && e.code ? ` (${e.code})` : '') + '.';
+  }
+}
+function erroFoto(e) {
+  switch (e && e.code) {
+    case 'too_large': return 'a foto passou do tamanho máximo.';
+    case 'unsupported_type': return 'o formato da foto não é aceito.';
+    case 'quota_or_state': return 'o espaço de fotos do app acabou.';
+    case 'rate_limited': return 'muitas fotos em pouco tempo; espere um pouco.';
+    case 'decode': return e.message || 'não consegui abrir a imagem.';
+    default: return 'erro ao guardar' + (e && e.code ? ` (${e.code})` : '') + '.';
+  }
+}
+const FATAIS_DRIVE = new Set(['sem_mcp', 'sem_acesso_pasta', 'sem_pasta_definida','needs_reauth', 'server_not_connected', 'selection_required', 'not_in_manifest', 'blocked_by_policy', 'approval_required', 'not_granted', 'capability_disabled', 'capability_removed', 'server_not_found']);
+
+/* ---------- salvar ---------- */
+let saveTimer = null;
+let retryTimer = null;
+const saver = { busy: false, again: false, p: null };
+window.addEventListener('online', () => { if (S.save === 'error' && S.v && !S.v._novo) flush(); });
+function setSave(st, err) {
+  S.save = st; S.saveErr = err || null;
+  const el = document.getElementById('save');
+  if (el) { el.textContent = saveTexto(); el.className = 'save' + (st === 'error' || st === 'offline' ? ' is-bad' : ''); }
+}
+function saveTexto() {
+  return { idle: '', pending: 'Alterações não salvas', saving: 'Salvando', saved: 'Salvo', error: 'Não salvou', offline: 'Sem salvar' }[S.save] || '';
+}
+function markDirty() {
+  const v = S.v;
+  if (!v || v._novo) return;
+  v.atualizadoEm = Date.now();
+  try { localStorage.setItem('ve-rascunho-' + v.id, JSON.stringify(v)); } catch (_) {}
+  setSave('pending');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 800);
+}
+function flush() {
+  clearTimeout(saveTimer);
+  const v = S.v;
+  if (!v || v._novo) return Promise.resolve();
+  if (!S.db) { setSave('offline'); return Promise.resolve(); }
+  if (saver.busy) { saver.again = true; return saver.p; }
+  saver.busy = true;
+  setSave('saving');
+  saver.p = (async () => {
+    let err = null;
+    do {
+      saver.again = false;
+      const ref = S.db.doc('vistorias/' + v.id);
+      try { await ref.set(clone(v)); err = null; }
+      catch (e) {
+        err = e;
+        if (e && e.code === 'unavailable') {
+          await sleep(600 + Math.random() * 900);
+          try { await ref.set(clone(v)); err = null; } catch (e2) { err = e2; }
+        }
+      }
+    } while (saver.again && !err);
+    saver.busy = false;
+    if (err) {
+      if (err.code === 'invalid_argument' && JSON.stringify(v).length > 250000) setSave('error', { code: 'grande' });
+      else setSave('error', err);
+      if (err.code === 'invalid_argument' && S.podeEscrever === null) S.podeEscrever = false;
+      if (err.code !== 'invalid_argument' && err.code !== 'revoked') {
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => { if (S.save === 'error' && S.v === v) flush(); }, 10000);
+      }
+    } else {
+      setSave('saved');
+      try { localStorage.removeItem('ve-rascunho-' + v.id); } catch (_) {}
+    }
+  })();
+  return saver.p;
+}
+let cfgTimer = null;
+function salvarCfg(agora) {
+  clearTimeout(cfgTimer);
+  const go = async () => { if (!S.db || !S.souDono) return; try { await S.db.doc('config/geral').set(clone(S.cfg)); } catch (_) { toast('Não consegui salvar as configurações.'); } };
+  if (agora) return go();
+  cfgTimer = setTimeout(go, 900);
+}
+
+/* ---------- fotos ---------- */
+async function abrirImagem(blob) {
+  if (window.createImageBitmap) {
+    try { const b = await createImageBitmap(blob, { imageOrientation: 'from-image' }); return { el: b, w: b.width, h: b.height, fim: () => b.close && b.close() }; } catch (_) {}
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('img')); i.src = url; });
+    return { el: img, w: img.naturalWidth, h: img.naturalHeight, fim: () => URL.revokeObjectURL(url) };
+  } catch (_) { URL.revokeObjectURL(url); throw { code: 'decode', message: 'não consegui abrir esta imagem.' }; }
+}
+async function reduzir(blob, max, q) {
+  const im = await abrirImagem(blob);
+  const k = Math.min(1, max / Math.max(im.w, im.h));
+  const w = Math.max(1, Math.round(im.w * k)), h = Math.max(1, Math.round(im.h * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(im.el, 0, 0, w, h); im.fim();
+  const out = await new Promise((res) => cv.toBlob(res, 'image/jpeg', q));
+  if (!out) throw { code: 'decode', message: 'não consegui converter esta imagem.' };
+  return { blob: out, w, h };
+}
+function paraDataURL(b) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); }); }
+async function paraBase64(b) { return (await paraDataURL(b)).split(',')[1] || ''; }
+async function pegarBlob(asset) {
+  if (S.blobs.has(asset)) return S.blobs.get(asset);
+  if (String(asset).startsWith('local-')) throw { code: 'sumiu', message: 'Esta foto ficou só na tela onde foi tirada.' };
+  const r = await fetch('/_blob/' + asset);
+  if (!r.ok) throw { code: 'sumiu', message: 'Foto não encontrada.' };
+  const b = await r.blob();
+  S.blobs.set(asset, b);
+  return b;
+}
+function fotoUrl(asset) {
+  if (S.urls.has(asset)) return S.urls.get(asset);
+  const b = S.blobs.get(asset);
+  if (b) { const u = URL.createObjectURL(b); S.urls.set(asset, u); return u; }
+  if (String(asset).startsWith('local-')) return '';
+  return '/_blob/' + asset;
+}
+const fotoPorCodigo = (v, code) => v.fotos.find((f) => f.code === code);
+function renumerar(v, n) {
+  v.fotos.filter((f) => f.lote === n && f.pendente).forEach((f, i) => { f.code = codigo(n, i + 1); });
+}
+
+async function aoEscolherFotos(files) {
+  const v = S.v;
+  if (!v || S.busy) return;
+  const n = v.loteAtual.n;
+  const pend = v.fotos.filter((f) => f.lote === n && f.pendente).length;
+  const vaga = MAX_FOTOS - pend - S.subindo;
+  const lista = [...files].filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name)).slice(0, Math.max(0, vaga));
+  if (files.length > lista.length) setMsg('lote', vaga <= 0 ? 'Este lote já tem 20 fotos. Processe o lote e mande o resto no próximo.' : `Cada lote aceita até 20 fotos. Fiquei com ${plural(lista.length, 'foto', 'fotos')}; mande o resto no próximo lote.`, 'warn');
+  for (const file of lista) {
+    const tmp = { id: 'tmp' + uid(), url: URL.createObjectURL(file) };
+    S.carregando.push(tmp); S.subindo++; desenharFotos();
+    try {
+      const r = await reduzir(file, 1600, 0.8);
+      let id;
+      if (S.assets) { const up = await S.assets.upload(r.blob, { type: 'image/jpeg' }); id = up.id; }
+      else id = 'local-' + uid();
+      S.blobs.set(id, r.blob);
+      v.fotos.push({ asset: id, lote: n, pendente: true, w: r.w, h: r.h, code: '' });
+      renumerar(v, n);
+      markDirty();
+    } catch (e) {
+      setMsg('lote', 'Não consegui guardar uma das fotos: ' + erroFoto(e), 'bad');
+    } finally {
+      S.subindo--; S.carregando = S.carregando.filter((x) => x !== tmp); URL.revokeObjectURL(tmp.url);
+      desenharFotos();
+    }
+  }
+}
+async function removerFoto(asset) {
+  const v = S.v; if (!v || S.busy) return;
+  const f = v.fotos.find((x) => x.asset === asset && x.pendente);
+  if (!f) return;
+  v.fotos = v.fotos.filter((x) => x !== f);
+  renumerar(v, f.lote);
+  markDirty(); desenharFotos();
+  if (S.assets && !String(asset).startsWith('local-')) { try { await S.assets.delete(asset); } catch (_) {} }
+}
+
+/* ---------- Google Drive ---------- */
+function payload(r) {
+  let p = r && r.payload !== undefined ? r.payload : r;
+  if (typeof p === 'string') { try { p = JSON.parse(p); } catch (_) {} }
+  return p;
+}
+function arquivoDe(p) {
+  if (!p || typeof p !== 'object') return null;
+  if (p.id) return p;
+  if (p.file && p.file.id) return p.file;
+  if (Array.isArray(p.files) && p.files[0] && p.files[0].id) return p.files[0];
+  return null;
+}
+const urlPasta = (id) => 'https://drive.google.com/drive/folders/' + encodeURIComponent(id);
+const urlArquivo = (id) => 'https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view';
+async function drive(tool, input) {
+  if (!S.mcp) throw { code: 'sem_mcp' };
+  return payload(await S.mcp.callTool(DRIVE, tool, input));
+}
+async function criarPasta(title, parentId) {
+  const base = { title }; if (parentId) base.parentId = parentId;
+  let p;
+  try { p = await drive('create_file', { ...base, contentMimeType: FOLDER }); }
+  catch (e) { if (e && e.code === 'tool_error') p = await drive('create_file', { ...base, mimeType: FOLDER }); else throw e; }
+  const f = arquivoDe(p);
+  if (!f) throw { code: 'formato', message: 'O Drive respondeu sem o código da pasta.' };
+  return f;
+}
+/* A pasta raiz é única da imobiliária: o dono do app cria ou escolhe, compartilha com a equipe,
+   e cada pessoa só confere se tem acesso a ela antes de gravar. */
+let raizPromise = null;
+let raizConferida = '';
+async function lerPasta(id) {
+  let f = null;
+  try { f = arquivoDe(await drive('get_file_metadata', { fileId: id, excludeContentSnippets: true })); }
+  catch (e) { if (!e || e.code !== 'tool_error') throw e; }
+  return f;
+}
+function garantirRaiz() {
+  if (S.cfg.driveRaizId && raizConferida === S.cfg.driveRaizId) return Promise.resolve(S.cfg.driveRaizId);
+  if (!raizPromise) {
+    raizPromise = (async () => {
+      const id = S.cfg.driveRaizId;
+      if (id) {
+        const f = await lerPasta(id);
+        if (!f || f.mimeType !== FOLDER || f.canAddChildren === false || f.trashed) throw { code: 'sem_acesso_pasta' };
+        raizConferida = id;
+        return id;
+      }
+      if (!S.souDono) throw { code: 'sem_pasta_definida' };
+      let f = null;
+      try {
+        const q = `mimeType = '${FOLDER}' and title = '${nomeRaizPadrao().replace(/'/g, "\\'")}' and owner = 'me'`;
+        const p = await drive('search_files', { query: q, pageSize: 5, excludeContentSnippets: true });
+        f = (p && Array.isArray(p.files) && p.files.find((x) => x && x.id && x.mimeType === FOLDER && !x.trashed)) || null;
+      } catch (e) { if (!e || e.code !== 'tool_error') throw e; }
+      if (!f) f = await criarPasta(nomeRaizPadrao());
+      S.cfg.driveRaizId = f.id;
+      S.cfg.driveRaizUrl = f.viewUrl || urlPasta(f.id);
+      S.cfg.driveRaizNome = f.title || nomeRaizPadrao();
+      raizConferida = f.id;
+      await salvarCfg(true);
+      return f.id;
+    })().finally(() => { raizPromise = null; });
+  }
+  return raizPromise;
+}
+async function prepararPastaRaiz() {
+  if (!S.souDono || S.cfgOcupado) return;
+  S.cfgOcupado = true; S.cfgAviso = ''; render();
+  try {
+    try { await garantirRaiz(); }
+    catch (e) {
+      if (!e || e.code !== 'sem_acesso_pasta') throw e;
+      S.cfg.driveRaizId = ''; S.cfg.driveRaizUrl = ''; S.cfg.driveRaizNome = ''; raizConferida = '';
+      await garantirRaiz();
+    }
+    toast('A pasta das vistorias está pronta no Google Drive.');
+  } catch (e) { S.cfgAviso = erroDrive(e); }
+  S.cfgOcupado = false; render();
+}
+async function trocarPastaRaiz() {
+  if (!S.souDono || S.cfgOcupado) return;
+  const bruto = String(S.novaPasta || '').trim();
+  const m = /folders\/([A-Za-z0-9_-]{10,})/.exec(bruto) || /^([A-Za-z0-9_-]{10,})$/.exec(bruto);
+  if (!m) { S.cfgAviso = 'Cole o link de uma pasta do Google Drive, do jeito que aparece na barra de endereço ao abrir a pasta.'; render(); return; }
+  S.cfgOcupado = true; S.cfgAviso = ''; render();
+  try {
+    const f = await lerPasta(m[1]);
+    if (!f || f.mimeType !== FOLDER) S.cfgAviso = 'Não achei essa pasta no seu Drive. Confira o link e se a pasta é sua ou está compartilhada com você como Editor.';
+    else if (f.canAddChildren === false) S.cfgAviso = 'Você não tem permissão para criar arquivos nessa pasta.';
+    else {
+      S.cfg.driveRaizId = f.id; S.cfg.driveRaizUrl = f.viewUrl || urlPasta(f.id); S.cfg.driveRaizNome = f.title || ''; raizConferida = f.id; S.novaPasta = '';
+      await salvarCfg(true);
+      toast('Pasta das vistorias trocada. As próximas vistorias vão para ela.');
+    }
+  } catch (e) { S.cfgAviso = erroDrive(e); }
+  S.cfgOcupado = false; render();
+}
+function tituloPasta(v) { return `Vistoria - ${String(v.endereco).replace(/\s+/g, ' ').trim().slice(0, 150)} - ${dataPasta(v.data)}`; }
+const pastaPromises = new Map();
+function garantirPastas(v) {
+  if (v.drive && v.drive.pasta && v.drive.imagens) return Promise.resolve(v.drive);
+  if (pastaPromises.has(v.id)) return pastaPromises.get(v.id);
+  const p = (async () => {
+    const raiz = await garantirRaiz();
+    v.drive = v.drive || {};
+    if (!v.drive.pasta) {
+      const nome = tituloPasta(v);
+      const f = await criarPasta(nome, raiz);
+      v.drive.pasta = f.id; v.drive.pastaUrl = f.viewUrl || urlPasta(f.id); v.drive.nome = nome;
+      markDirty();
+    }
+    if (!v.drive.imagens) { const f = await criarPasta('Imagens', v.drive.pasta); v.drive.imagens = f.id; markDirty(); }
+    delete S.avisos['drive-' + v.id];
+    return v.drive;
+  })().finally(() => pastaPromises.delete(v.id));
+  pastaPromises.set(v.id, p);
+  return p;
+}
+async function enviarArquivo(blob, title, mime, parentId, nomeArquivo) {
+  const input = { title, parentId, contentMimeType: mime, disableConversionToGoogleType: true };
+  if (S.fileArgs) input.base64Content = { $file: { data: blob, name: nomeArquivo, type: mime } };
+  else {
+    const b64 = await paraBase64(blob);
+    if (b64.length > 980000) throw { code: 'grande' };
+    input.base64Content = b64;
+  }
+  const f = arquivoDe(await drive('create_file', input));
+  if (!f) throw { code: 'formato', message: 'O Drive respondeu sem o código do arquivo.' };
+  return f;
+}
+/* Cópia de segurança: os dados completos da vistoria vão para a subpasta Dados, num arquivo novo a cada lote e a cada laudo. */
+async function salvarCopia(v, rotulo) {
+  if (!S.mcp) return { erro: { code: 'sem_mcp' } };
+  try {
+    const d = await garantirPastas(v);
+    if (!d.dados) { const f = await criarPasta('Dados', d.pasta); d.dados = f.id; markDirty(); }
+    const corpo = JSON.stringify({ app: 'Vistoria de Imóveis', formato: 1, geradoEm: new Date().toISOString(), vistoria: v }, null, 1);
+    const f = arquivoDe(await drive('create_file', {
+      title: `Dados da vistoria - ${rotulo}.json`, parentId: d.dados,
+      contentMimeType: 'application/json', disableConversionToGoogleType: true, textContent: corpo,
+    }));
+    if (!f) throw { code: 'formato', message: 'O Drive respondeu sem o código do arquivo.' };
+    v.ultimaCopia = { em: Date.now(), rotulo };
+    markDirty();
+    return { ok: true };
+  } catch (e) { return { erro: e }; }
+}
+function campoCSV(s) {
+  s = String(s ?? '').replace(/\r?\n/g, ' ');
+  return /[";]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+async function baixarPlanilha() {
+  if (!S.downloads) { toast('Esta tela não permite baixar arquivos.'); return; }
+  const linhas = [['Tipo', 'Endereço', 'Descrição do imóvel', 'Data', 'Situação', 'Arquivada', 'Cômodo', 'Item', 'Estado', 'Ponto de atenção', 'Descrição do item', 'Fotos', 'Pasta no Drive']];
+  for (const v of S.lista) {
+    const base = [v.tipo === 'saida' ? 'Saída' : 'Entrada', v.endereco, v.descricao, dataCurta(v.data), faseTexto(v), v.arquivada ? 'Sim' : 'Não'];
+    const pasta = (v.drive && (v.drive.pastaUrl || (v.drive.pasta && urlPasta(v.drive.pasta)))) || '';
+    const itens = [];
+    (v.comodos || []).forEach((c) => (c.itens || []).forEach((i) => itens.push([c.nome, i.nome, estadoLabel(i.estado), i.critico ? 'Sim' : 'Não', i.descricao, (i.fotos || []).join(', ')])));
+    if (!itens.length) itens.push(['', '', '', '', '', '']);
+    for (const it of itens) linhas.push([...base, ...it, pasta]);
+  }
+  const csv = '﻿' + linhas.map((l) => l.map(campoCSV).join(';')).join('\r\n');
+  try { await S.downloads.save({ filename: `vistorias-${hojeISO()}.csv`, data: csv }); }
+  catch (e) { if (e && e.code !== 'declined') toast('Não consegui baixar a planilha' + (e.code ? ` (${e.code})` : '') + '.'); }
+}
+async function enviarFotosDrive(v, fotos, aoAvancar, signal) {
+  const r = { ok: 0, total: fotos.length, erro: null };
+  if (!fotos.length) return r;
+  let d;
+  try { d = await garantirPastas(v); } catch (e) { r.erro = e; return r; }
+  for (const f of fotos) {
+    if (signal && signal.aborted) break;
+    if (!f.drive) {
+      try {
+        const blob = await pegarBlob(f.asset);
+        let arq;
+        try { arq = await enviarArquivo(blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg'); }
+        catch (e) {
+          if (!e || e.code !== 'grande') throw e;
+          const menor = await reduzir(blob, 1200, 0.7);
+          arq = await enviarArquivo(menor.blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg');
+        }
+        f.drive = arq.id;
+        markDirty();
+      } catch (e) {
+        r.erro = e;
+        if (e && FATAIS_DRIVE.has(e.code)) break;
+        aoAvancar && aoAvancar(r);
+        continue;
+      }
+    }
+    r.ok++;
+    aoAvancar && aoAvancar(r);
+  }
+  return r;
+}
+
+/* ---------- Claude ---------- */
+function relatorioJSON(lista, comFotos) {
+  return JSON.stringify(lista.map((c) => ({
+    comodo: c.nome,
+    observacoes: c.observacoes || '',
+    itens: c.itens.map((i) => {
+      const o = { item: i.nome, estado: i.estado || '', descricao: i.descricao || '', critico: !!i.critico };
+      if (comFotos) o.fotos = i.fotos;
+      return o;
+    }),
+  })));
+}
+function entradaDe(v) { return v && v.entradaId ? S.lista.find((x) => x.id === v.entradaId) || null : null; }
+function cabecalhoPrompt(v) {
+  return [
+    `Você organiza laudos de vistoria de imóveis para ${S.cfg.empresa ? 'a ' + S.cfg.empresa : 'uma imobiliária'}${S.cfg.cidade ? ' (' + S.cfg.cidade + ')' : ''}.`,
+    v.tipo === 'saida' ? 'Esta é uma vistoria de SAÍDA: o locatário está devolvendo o imóvel.' : 'Esta é uma vistoria de ENTRADA: registra o estado do imóvel antes de o locatário receber as chaves.',
+    `Imóvel: ${v.endereco}. ${v.descricao}.`,
+  ];
+}
+function promptLote(v, work, n, fotos, texto, parte, de, comImagens) {
+  const codes = fotos.map((f) => f.code);
+  const e = v.tipo === 'saida' ? entradaDe(v) : null;
+  const linhas = cabecalhoPrompt(v);
+  linhas.push('');
+  if (!codes.length) linhas.push(`Lote ${n}: sem fotos, só a fala do vistoriador.`);
+  else if (comImagens) {
+    linhas.push(`Lote ${n}${de > 1 ? `, parte ${parte} de ${de}` : ''}: ${codes.length} fotos anexadas, nesta ordem: ${codes.join(', ')}. A primeira imagem é ${codes[0]}${codes[1] ? `, a segunda é ${codes[1]}` : ''}, e assim por diante.`);
+    if (de > 1) linhas.push('As fotos das outras partes deste lote são tratadas em outros pedidos. A fala abaixo vale para o lote inteiro.');
+  } else linhas.push(`Lote ${n}: ${codes.length} fotos com os códigos ${codes.join(', ')}. Você não consegue ver as imagens; ligue cada código ao item pela ordem e pelo que a fala descreve.`);
+  linhas.push('', 'Fala do vistoriador sobre este lote (ditada por voz; pode ter erros de reconhecimento de voz, então corrija o sentido sem inventar):', '"""', texto.slice(0, 24000), '"""', '');
+  linhas.push('Relatório até agora (JSON, cômodos e itens já registrados nos lotes anteriores):', relatorioJSON(work.comodos, false));
+  if (e && e.comodos && e.comodos.length) {
+    linhas.push('', 'Cômodos e itens da vistoria de ENTRADA deste imóvel. Quando se referir à mesma coisa, use exatamente estes nomes:');
+    for (const c of e.comodos) linhas.push(`- ${c.nome}: ${c.itens.map((i) => i.nome).join(', ')}`);
+  }
+  linhas.push('',
+    'O que fazer:',
+    '1. Ligue cada foto ao cômodo e ao item que ela mostra, usando a fala e o que se vê na imagem.',
+    '2. Registre cada item citado na fala ou claramente visível nas fotos, com estado e descrição em português formal de laudo de vistoria: terceira pessoa, frases objetivas, material, cor, quantidade e defeitos quando houver. Não invente defeitos nem detalhes que não foram ditos ou não se veem com clareza.',
+    '3. Se o item já está no relatório, devolva a descrição completa, unindo o texto anterior com a informação nova, sem perder nada do que já estava escrito. Vale o mesmo para as observações do cômodo.',
+    '4. Se o cômodo já existe no relatório, use exatamente o mesmo nome. Para cômodos novos use nomes padrão como Sala, Cozinha, Quarto 1, Quarto 2, Banheiro social, Banheiro da suíte, Área de serviço, Varanda, Garagem, Área externa.',
+    '5. Leituras de medidores (água, luz, gás) e chaves entregues vão no cômodo "Medidores e chaves".',
+    '6. Use "critico": true para dano, defeito, vazamento, infiltração, mofo, item quebrado ou faltando.',
+    '7. Devolva só os cômodos que este lote tocou e, dentro deles, só os itens novos ou alterados.',
+    '8. Se faltou algo importante para o laudo (estado de um item citado sem detalhe, foto que não dá para identificar), escreva uma pergunta curta em "duvidas".',
+    '',
+    'Responda apenas com JSON neste formato:',
+    '{"comodos":[{"nome":"Cozinha","observacoes":"","itens":[{"nome":"Torneira da pia","estado":"ruim","descricao":"Torneira metálica cromada, com vazamento contínuo na base.","fotos":["L01-F02"],"critico":true}]}],"fotosSemItem":[],"resumo":"Uma frase sobre o que este lote registrou.","duvidas":[]}',
+    'Valores de "estado": "novo", "bom", "regular", "ruim" ou "nao_se_aplica". Deixe "observacoes" vazio quando não houver nada novo sobre o cômodo como um todo.');
+  return linhas.join('\n');
+}
+function aplicarResultado(work, r, codesDoLote, todos) {
+  const mudancas = [];
+  const ligados = new Set();
+  for (const rc of Array.isArray(r && r.comodos) ? r.comodos : []) {
+    const nome = String((rc && rc.nome) || '').trim();
+    if (!nome) continue;
+    let c = work.comodos.find((x) => norm(x.nome) === norm(nome));
+    if (!c) { c = { id: uid(), nome, itens: [], observacoes: '' }; work.comodos.push(c); }
+    if (rc.observacoes && String(rc.observacoes).trim()) c.observacoes = String(rc.observacoes).trim();
+    for (const ri of Array.isArray(rc.itens) ? rc.itens : []) {
+      const inome = String((ri && ri.nome) || '').trim();
+      if (!inome) continue;
+      let it = c.itens.find((x) => norm(x.nome) === norm(inome));
+      const novo = !it;
+      if (!it) { it = { id: uid(), nome: inome, estado: '', descricao: '', fotos: [], critico: false }; c.itens.push(it); }
+      if (ESTADO_OK.has(ri.estado)) it.estado = ri.estado;
+      if (ri.descricao && String(ri.descricao).trim()) it.descricao = String(ri.descricao).trim();
+      if (typeof ri.critico === 'boolean') it.critico = ri.critico;
+      for (const raw of Array.isArray(ri.fotos) ? ri.fotos : []) {
+        const code = codigoCanon(raw);
+        if (!code || !todos.has(code)) continue;
+        if (!it.fotos.includes(code)) it.fotos.push(code);
+        ligados.add(code);
+      }
+      mudancas.push({ comodo: c.nome, item: it.nome, estado: it.estado, critico: !!it.critico, novo });
+    }
+  }
+  const usados = new Set();
+  work.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((f) => usados.add(f))));
+  work.fotosSoltas = (work.fotosSoltas || []).filter((f) => !usados.has(f));
+  for (const code of codesDoLote) if (!usados.has(code) && !work.fotosSoltas.includes(code)) work.fotosSoltas.push(code);
+  return mudancas;
+}
+function semRepetir(m) {
+  const mapa = new Map();
+  for (const x of m) mapa.set(norm(x.comodo) + '|' + norm(x.item), x);
+  return [...mapa.values()];
+}
+async function organizarLote(v, n, fotos, texto, signal, aoParte) {
+  const work = { comodos: clone(v.comodos), fotosSoltas: [...(v.fotosSoltas || [])] };
+  const todos = new Set(v.fotos.map((f) => f.code));
+  const comImagens = S.imgMax > 0 && fotos.length > 0;
+  const grupos = [];
+  if (comImagens) for (let i = 0; i < fotos.length; i += S.imgMax) grupos.push(fotos.slice(i, i + S.imgMax));
+  else grupos.push(fotos);
+  const out = { mudancas: [], resumos: [], duvidas: [] };
+  for (let i = 0; i < grupos.length; i++) {
+    aoParte && aoParte(i + 1, grupos.length);
+    const g = grupos[i];
+    const prompt = promptLote(v, work, n, g, texto, i + 1, grupos.length, comImagens);
+    const opts = { signal, modelTier: 'default' };
+    if (comImagens) opts.images = await Promise.all(g.map((f) => pegarBlob(f.asset)));
+    const r = await S.sample.json(prompt, opts);
+    if (!r || typeof r !== 'object' || !Array.isArray(r.comodos)) throw { code: 'invalid_json' };
+    out.mudancas.push(...aplicarResultado(work, r, g.map((f) => f.code), todos));
+    if (r.resumo) out.resumos.push(String(r.resumo).trim());
+    if (Array.isArray(r.duvidas)) out.duvidas.push(...r.duvidas.map(String).map((s) => s.trim()).filter(Boolean));
+  }
+  return { ...out, mudancas: semRepetir(out.mudancas), comodos: work.comodos, fotosSoltas: work.fotosSoltas };
+}
+function guardarSemClaude(v, n, texto, codes) {
+  let c = v.comodos.find((x) => norm(x.nome) === 'a organizar');
+  if (!c) { c = { id: uid(), nome: 'A organizar', itens: [], observacoes: '' }; v.comodos.push(c); }
+  const it = { id: uid(), nome: `Lote ${n}`, estado: '', descricao: texto, fotos: codes.slice(), critico: false };
+  c.itens.push(it);
+  v.fotosSoltas = (v.fotosSoltas || []).filter((f) => !codes.includes(f));
+  return [{ comodo: c.nome, item: it.nome, estado: '', critico: false, novo: true }];
+}
+async function compararComEntrada(v, e, signal) {
+  const linhas = cabecalhoPrompt(v);
+  linhas.push('',
+    `Compare a vistoria de ENTRADA (${dataCurta(e.data)}) com a vistoria de SAÍDA (${dataCurta(v.data)}) deste imóvel.`,
+    '', 'ENTRADA (JSON):', relatorioJSON(e.comodos || [], false),
+    '', 'SAÍDA (JSON):', relatorioJSON(v.comodos, false),
+    '',
+    'Para cada item que aparece em uma das duas vistorias, classifique a "situacao":',
+    '- "sem_alteracao": mesmo estado da entrada.',
+    '- "desgaste_natural": piora compatível com o uso normal ao longo do tempo (pintura gasta, pequenos riscos, desbotamento).',
+    '- "dano": piora além do uso normal (quebra, furo, mancha forte, falta de limpeza, alteração sem autorização).',
+    '- "faltando": item que existia na entrada e não aparece ou foi retirado na saída.',
+    '- "novo": item que não existia na entrada.',
+    '- "avaliar": quando a informação não basta para decidir.',
+    'Relacione itens com nomes parecidos (Quarto 1 e Quarto principal, por exemplo). Em "explicacao", diga em uma ou duas frases o que mudou. Em "sugestao", escreva uma sugestão prudente para a imobiliária, como "Sem cobrança", "Reparo ou reposição pelo locatário" ou "Avaliar com o proprietário". É só uma sugestão, sem tom jurídico.',
+    'Em "resumo", duas a quatro frases sobre o resultado geral da comparação.',
+    '',
+    'Responda apenas com JSON neste formato:',
+    '{"resumo":"...","itens":[{"comodo":"Cozinha","item":"Torneira da pia","entrada":"bom","saida":"ruim","situacao":"dano","explicacao":"...","sugestao":"Reparo ou reposição pelo locatário"}]}',
+    'Valores de "entrada" e "saida": "novo", "bom", "regular", "ruim", "nao_se_aplica" ou "" quando o item não existe naquela vistoria.');
+  const r = await S.sample.json(linhas.join('\n'), { signal, modelTier: 'default' });
+  if (!r || !Array.isArray(r.itens)) throw { code: 'invalid_json' };
+  v.comparacao = {
+    em: Date.now(), entradaId: e.id, desatualizada: false,
+    resumo: String(r.resumo || '').trim(),
+    itens: r.itens.filter((x) => x && (x.item || x.comodo)).map((x) => ({
+      id: uid(),
+      comodo: String(x.comodo || '').trim(),
+      item: String(x.item || '').trim(),
+      entrada: ESTADO_OK.has(x.entrada) ? x.entrada : '',
+      saida: ESTADO_OK.has(x.saida) ? x.saida : '',
+      situacao: SIT_OK.has(x.situacao) ? x.situacao : 'avaliar',
+      explicacao: String(x.explicacao || '').trim(),
+      sugestao: String(x.sugestao || '').trim(),
+    })),
+  };
+}
+async function escreverParecer(v, signal) {
+  const linhas = cabecalhoPrompt(v);
+  const criticos = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => { if (i.critico || i.estado === 'ruim') criticos.push(`${c.nome}, ${i.nome}: ${i.descricao}`); }));
+  linhas.push('',
+    `Escreva as "Considerações finais" do laudo de vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'} realizada em ${dataLonga(v.data)}.`,
+    'Um parágrafo de três a cinco frases, em português formal: estado geral do imóvel, os principais pontos de atenção e, na saída, o resultado da comparação com a entrada.',
+    'Sem prometer nada, sem juízo jurídico, sem travessão, sem markdown, sem título. Responda só com o parágrafo.',
+    '', 'Relatório (JSON):', relatorioJSON(v.comodos, false),
+    '', 'Pontos de atenção:', criticos.length ? criticos.join('\n') : 'Nenhum item marcado como crítico.');
+  if (v.comparacao && v.comparacao.resumo) linhas.push('', 'Resumo da comparação com a entrada:', v.comparacao.resumo);
+  if (v.observacoesGerais) linhas.push('', 'Observações gerais do vistoriador:', v.observacoesGerais);
+  const { text } = await S.sample(linhas.join('\n'), { signal, modelTier: 'default' });
+  v.parecer = String(text || '').trim().replace(/^["“]+|["”]+$/g, '').replace(/\s*[—–]\s*/g, ', ');
+  v.parecerDesatualizado = false;
+}
+
+/* ---------- ações principais ---------- */
+function novaVistoria() {
+  return {
+    id: uid(), v: 1, tipo: 'entrada', entradaId: '', endereco: '', descricao: '', data: hojeISO(),
+    locador: '', locatario: '', codigo: '', vistoriador: S.meuNome || '',
+    fase: 'dados', status: 'andamento', drive: {}, lotes: [], fotos: [], fotosSoltas: [], comodos: [],
+    loteAtual: { n: 1, texto: '' }, observacoesGerais: '', comparacao: null, parecer: '', pdfVersao: 0,
+    criadoEm: Date.now(), atualizadoEm: Date.now(), _novo: true,
+  };
+}
+async function criar() {
+  const v = S.v;
+  const faltam = [];
+  if (!v.endereco.trim()) faltam.push('o endereço completo');
+  if (!v.descricao.trim()) faltam.push('a descrição breve');
+  if (!v.data) faltam.push('a data da vistoria');
+  if (faltam.length) { setMsg('dados', `Falta ${listaPt(faltam)}.`, 'warn'); return; }
+  if (!S.db) { setMsg('dados', 'Este app só guarda vistorias quando aberto pelo claude.ai, com a sua conta logada.', 'bad'); return; }
+  delete v._novo;
+  v.criadoPor = S.meuId || null;
+  v.fase = 'lotes'; S.aba = 'lotes'; S.msg = null;
+  S.criandoPasta = true;
+  render();
+  await flush();
+  try { await garantirPastas(v); }
+  catch (e) { S.avisos['drive-' + v.id] = erroDrive(e); }
+  S.criandoPasta = false;
+  markDirty();
+  render();
+}
+async function tentarDrive() {
+  const v = S.v; if (!v) return;
+  S.criandoPasta = true; delete S.avisos['drive-' + v.id]; render();
+  try { await garantirPastas(v); toast('Pasta criada no Google Drive.'); }
+  catch (e) { S.avisos['drive-' + v.id] = erroDrive(e); }
+  S.criandoPasta = false; render();
+}
+function setPasso(k, st, det) {
+  if (!S.busy) return;
+  const p = S.busy.passos.find((x) => x.k === k);
+  if (!p) return;
+  if (st) p.st = st;
+  if (det !== undefined) p.det = det;
+  const el = document.getElementById('busy');
+  if (el) el.outerHTML = viewBusy();
+}
+async function processarLote() {
+  const v = S.v;
+  if (!v || S.busy) return;
+  const n = v.loteAtual.n;
+  if (S.subindo > 0) { setMsg('lote', 'Espere as fotos terminarem de ser guardadas.', 'warn'); return; }
+  const fotos = v.fotos.filter((f) => f.lote === n && f.pendente);
+  const texto = String(v.loteAtual.texto || '').trim();
+  if (fotos.length && !texto) { setMsg('lote', MSG_SEM_FALA, 'warn'); const t = document.getElementById('f-fala'); if (t) t.focus(); return; }
+  if (!fotos.length && !texto) { setMsg('lote', 'Adicione as fotos do lote e a descrição falada.', 'warn'); return; }
+  const ctl = new AbortController();
+  S.msg = null; S.ultimo = null;
+  S.busy = {
+    vid: v.id, titulo: `Processando o lote ${n}`, ctl, podeParar: true,
+    passos: [
+      { k: 'fotos', txt: 'Fotos guardadas no app', st: fotos.length ? 'ok' : 'skip', det: fotos.length ? plural(fotos.length, 'foto', 'fotos') : 'lote só com fala' },
+      { k: 'drive', txt: 'Enviando as fotos para a pasta Imagens no Drive', st: fotos.length ? 'run' : 'skip', det: '' },
+      { k: 'claude', txt: S.sample ? 'Claude ligando fotos e fala aos cômodos' : 'Guardando o lote para organizar na revisão', st: 'run', det: S.sample ? 'costuma levar de 20 segundos a 2 minutos' : '' },
+      { k: 'copia', txt: 'Cópia de segurança dos dados no Drive', st: 'wait', det: '' },
+    ],
+  };
+  render();
+  const pDrive = enviarFotosDrive(v, fotos, (r) => setPasso('drive', 'run', `${r.ok} de ${r.total}`), ctl.signal).then((r) => {
+    const falhou = r.erro && r.ok < r.total;
+    setPasso('drive', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)}` : `${r.ok} de ${r.total} na pasta Imagens`);
+    if (falhou) S.avisos['drive-' + v.id] = erroDrive(r.erro);
+    return r;
+  });
+  let org = null, erro = null;
+  if (S.sample) {
+    try {
+      org = await organizarLote(v, n, fotos, texto, ctl.signal, (i, t) => { if (t > 1) setPasso('claude', 'run', `parte ${i} de ${t}`); });
+      setPasso('claude', 'ok', '');
+    } catch (e) { erro = e; setPasso('claude', 'err', erroClaude(e)); }
+  }
+  const rDrive = await pDrive;
+  if (erro) {
+    S.busy = null;
+    if (erro.code !== 'cancelled') setMsg('lote', 'O lote não foi processado. ' + erroClaude(erro) + ' As fotos continuam guardadas.', 'bad', true);
+    markDirty();
+    render();
+    return;
+  }
+  const codes = fotos.map((f) => f.code);
+  let mudancas;
+  if (org) { v.comodos = org.comodos; v.fotosSoltas = org.fotosSoltas; mudancas = org.mudancas; }
+  else mudancas = guardarSemClaude(v, n, texto, codes);
+  fotos.forEach((f) => { delete f.pendente; });
+  const lote = {
+    n, texto, fotos: codes, em: Date.now(),
+    resumo: org ? org.resumos.join(' ') : 'Lote guardado sem organização automática. Organize os itens na revisão.',
+    duvidas: org ? org.duvidas.slice(0, 6) : [],
+  };
+  v.lotes.push(lote);
+  v.loteAtual = { n: n + 1, texto: '' };
+  if (v.comparacao) v.comparacao.desatualizada = true;
+  if (v.parecer) v.parecerDesatualizado = true;
+  markDirty();
+  await flush();
+  setPasso('copia', 'run');
+  const rCopia = await salvarCopia(v, `após o lote ${pad(n)}`);
+  setPasso('copia', rCopia.ok ? 'ok' : 'err', rCopia.ok ? 'na subpasta Dados' : erroDrive(rCopia.erro));
+  await flush();
+  S.ultimo = { vid: v.id, lote, mudancas, drive: rDrive, copia: rCopia };
+  S.pedirProximo = true;
+  S.busy = null;
+  render();
+  window.scrollTo(0, 0);
+}
+async function consolidar() {
+  const v = S.v;
+  if (!v || S.busy) return;
+  if (!v.lotes.length) { setMsg('lote', 'Processe pelo menos um lote antes de consolidar.', 'warn'); return; }
+  S.ultimo = null; S.pedirProximo = false;
+  v.fase = 'revisao'; S.aba = 'revisao';
+  markDirty();
+  const e = v.tipo === 'saida' ? entradaDe(v) : null;
+  const fazComp = !!(e && (!v.comparacao || v.comparacao.desatualizada || v.comparacao.entradaId !== e.id));
+  const fazParecer = !String(v.parecer || '').trim() || !!v.parecerDesatualizado;
+  if (!S.sample || (!fazComp && !fazParecer)) { render(); window.scrollTo(0, 0); return; }
+  const ctl = new AbortController();
+  const passos = [];
+  if (fazComp) passos.push({ k: 'comp', txt: 'Comparando com a vistoria de entrada', st: 'run', det: '' });
+  if (fazParecer) passos.push({ k: 'parecer', txt: 'Escrevendo as considerações finais', st: fazComp ? 'wait' : 'run', det: '' });
+  S.busy = { vid: v.id, titulo: 'Consolidando a vistoria', passos, ctl, podeParar: true };
+  render();
+  if (fazComp) {
+    try { await compararComEntrada(v, e, ctl.signal); setPasso('comp', 'ok', ''); delete S.avisos['comp-' + v.id]; }
+    catch (err) {
+      setPasso('comp', 'err', erroClaude(err));
+      if (err.code === 'cancelled') { S.busy = null; render(); return; }
+      S.avisos['comp-' + v.id] = 'Não consegui comparar com a entrada. ' + erroClaude(err);
+    }
+  }
+  if (fazParecer) {
+    setPasso('parecer', 'run');
+    try { await escreverParecer(v, ctl.signal); setPasso('parecer', 'ok', ''); delete S.avisos['parecer-' + v.id]; }
+    catch (err) {
+      setPasso('parecer', 'err', erroClaude(err));
+      if (err.code !== 'cancelled') S.avisos['parecer-' + v.id] = 'Não consegui escrever as considerações finais. ' + erroClaude(err);
+    }
+  }
+  markDirty();
+  await flush();
+  S.busy = null;
+  render();
+  window.scrollTo(0, 0);
+}
+async function refazer(tipo) {
+  const v = S.v;
+  if (!v || S.busy || !S.sample) return;
+  const e = entradaDe(v);
+  if (tipo === 'comp' && !e) return;
+  const ctl = new AbortController();
+  S.busy = { vid: v.id, titulo: tipo === 'comp' ? 'Comparando de novo' : 'Reescrevendo as considerações finais', ctl, podeParar: true, passos: [{ k: tipo, txt: tipo === 'comp' ? 'Comparando com a vistoria de entrada' : 'Escrevendo as considerações finais', st: 'run', det: '' }] };
+  render();
+  try {
+    if (tipo === 'comp') await compararComEntrada(v, e, ctl.signal); else await escreverParecer(v, ctl.signal);
+    delete S.avisos[tipo + '-' + v.id];
+  } catch (err) { if (err.code !== 'cancelled') S.avisos[tipo + '-' + v.id] = erroClaude(err); }
+  markDirty();
+  S.busy = null;
+  render();
+}
+async function corrigir() {
+  const v = S.v;
+  if (!v || S.busy || !S.sample) return;
+  const instr = String(S.correcao || '').trim();
+  if (!instr) { setMsg('corr', 'Diga ou escreva o que precisa mudar.', 'warn'); return; }
+  const ctl = new AbortController();
+  S.busy = { vid: v.id, titulo: 'Aplicando a correção', ctl, podeParar: true, passos: [{ k: 'corr', txt: 'Claude ajustando o relatório', st: 'run', det: '' }] };
+  render();
+  const linhas = cabecalhoPrompt(v);
+  linhas.push('', 'Relatório atual (JSON, com os códigos das fotos de cada item):', relatorioJSON(v.comodos, true),
+    '', 'O vistoriador pediu esta correção (ditada por voz, pode ter erros de reconhecimento):', '"""', instr.slice(0, 12000), '"""',
+    '', 'Aplique só o que foi pedido. Mantenha o português formal de laudo. Para cada item alterado, devolva a descrição completa já corrigida. Não mude o que não foi citado.',
+    'Responda apenas com JSON neste formato:',
+    '{"renomear":[{"de":"Quarto","para":"Quarto 1"}],"remover":[{"comodo":"Cozinha","item":"Filtro"}],"comodos":[{"nome":"Cozinha","observacoes":"","itens":[{"nome":"Torneira da pia","estado":"regular","descricao":"...","fotos":["L01-F02"],"critico":false}]}],"resumo":"Uma frase dizendo o que mudou."}',
+    'Em "remover", deixe "item" vazio para remover o cômodo inteiro. Use listas vazias quando não houver nada. Valores de "estado": "novo", "bom", "regular", "ruim" ou "nao_se_aplica".');
+  try {
+    const r = await S.sample.json(linhas.join('\n'), { signal: ctl.signal, modelTier: 'default' });
+    if (!r || typeof r !== 'object') throw { code: 'invalid_json' };
+    S.desfazer = { vid: v.id, comodos: clone(v.comodos), fotosSoltas: clone(v.fotosSoltas || []) };
+    for (const rn of Array.isArray(r.renomear) ? r.renomear : []) {
+      const c = v.comodos.find((x) => norm(x.nome) === norm(rn && rn.de));
+      if (c && rn.para && String(rn.para).trim()) c.nome = String(rn.para).trim();
+    }
+    for (const rm of Array.isArray(r.remover) ? r.remover : []) {
+      const c = v.comodos.find((x) => norm(x.nome) === norm(rm && rm.comodo));
+      if (!c) continue;
+      if (!rm.item || !String(rm.item).trim()) v.comodos = v.comodos.filter((x) => x !== c);
+      else c.itens = c.itens.filter((i) => norm(i.nome) !== norm(rm.item));
+    }
+    const work = { comodos: v.comodos, fotosSoltas: v.fotosSoltas || [] };
+    aplicarResultado(work, r, [], new Set(v.fotos.map((f) => f.code)));
+    const usados = new Set();
+    v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((f) => usados.add(f))));
+    v.fotosSoltas = [...new Set([...work.fotosSoltas, ...v.fotos.map((f) => f.code).filter((code) => !usados.has(code) && !v.fotos.find((f) => f.code === code).pendente)])];
+    if (v.comparacao) v.comparacao.desatualizada = true;
+    if (v.parecer) v.parecerDesatualizado = true;
+    S.correcao = '';
+    markDirty();
+    S.busy = null;
+    render();
+    toast(String(r.resumo || 'Correção aplicada.'), 'Desfazer', 'desfazer');
+  } catch (err) {
+    S.busy = null;
+    if (err.code !== 'cancelled') setMsg('corr', 'A correção não foi aplicada. ' + erroClaude(err), 'bad');
+    render();
+  }
+}
+function desfazerCorrecao() {
+  const v = S.v, d = S.desfazer;
+  if (!v || !d || d.vid !== v.id) return;
+  v.comodos = d.comodos; v.fotosSoltas = d.fotosSoltas; S.desfazer = null;
+  markDirty(); render(); toast('Correção desfeita.');
+}
+function nomePDF(v) {
+  const base = `Laudo de Vistoria - ${String(v.endereco).replace(/\s+/g, ' ').trim().slice(0, 140)} - ${dataPasta(v.data)}`;
+  return (v.pdfVersao ? `${base} - versão ${v.pdfVersao + 1}` : base) + '.pdf';
+}
+async function finalizar() {
+  const v = S.v;
+  if (!v || S.busy) return;
+  if (!window.jspdf || !window.jspdf.jsPDF) { setMsg('aprovar', 'A parte que monta o PDF não carregou. Recarregue a página e tente de novo.', 'bad'); return; }
+  await flush();
+  v.fase = 'laudo'; S.aba = 'laudo'; S.laudoAviso = ''; S.laudoErro = '';
+  markDirty();
+  const faltam = v.fotos.filter((f) => !f.drive && !f.pendente);
+  S.busy = {
+    vid: v.id, titulo: 'Gerando o laudo', podeParar: false,
+    passos: [
+      { k: 'pastas', txt: 'Conferindo a pasta da vistoria no Drive', st: 'run', det: '' },
+      { k: 'fotos', txt: 'Enviando ao Drive as fotos que faltavam', st: faltam.length ? 'wait' : 'skip', det: faltam.length ? '' : 'todas já estão lá' },
+      { k: 'img', txt: 'Preparando as fotos do laudo', st: 'wait', det: '' },
+      { k: 'pdf', txt: 'Montando o PDF', st: 'wait', det: '' },
+      { k: 'up', txt: 'Salvando o PDF na pasta da vistoria', st: 'wait', det: '' },
+      { k: 'copia', txt: 'Cópia de segurança dos dados no Drive', st: 'wait', det: '' },
+    ],
+  };
+  render();
+  window.scrollTo(0, 0);
+  let driveOk = true;
+  try { await garantirPastas(v); setPasso('pastas', 'ok', v.drive.nome || ''); }
+  catch (e) { driveOk = false; setPasso('pastas', 'err', erroDrive(e)); }
+  if (faltam.length) {
+    if (driveOk) {
+      setPasso('fotos', 'run');
+      const r = await enviarFotosDrive(v, faltam, (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`));
+      const falhou = r.erro && r.ok < r.total;
+      setPasso('fotos', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)}` : `${r.ok} de ${r.total}`);
+    } else setPasso('fotos', 'skip', 'sem Drive');
+  }
+  let blob;
+  try {
+    blob = await gerarPDF(v, (k, det) => setPasso(k, 'run', det), (k) => setPasso(k, 'ok'));
+    setPasso('pdf', 'ok', tamanho(blob.size));
+  } catch (e) {
+    setPasso('pdf', 'err', (e && e.message) || 'Não consegui montar o PDF.');
+    S.laudoErro = 'Não consegui montar o PDF. ' + ((e && e.message) || '');
+    S.busy = null; render(); return;
+  }
+  const nome = nomePDF(v);
+  S.pdf = { vid: v.id, blob, nome };
+  if (driveOk) {
+    setPasso('up', 'run');
+    try {
+      const f = await enviarArquivo(blob, nome, 'application/pdf', v.drive.pasta, 'laudo-vistoria.pdf');
+      v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = nome;
+      v.pdfVersao = (v.pdfVersao || 0) + 1;
+      setPasso('up', 'ok', '');
+    } catch (e) {
+      setPasso('up', 'err', erroDrive(e));
+      S.laudoAviso = 'O PDF ficou pronto, mas não foi para o Drive: ' + erroDrive(e) + ' Baixe o arquivo e arraste para a pasta da vistoria.';
+    }
+  } else {
+    setPasso('up', 'skip', 'sem Drive');
+    S.laudoAviso = 'O PDF ficou pronto, mas o Google Drive não está disponível agora. Baixe o arquivo e guarde na pasta da vistoria.';
+  }
+  v.status = 'concluida'; v.concluidaEm = Date.now();
+  if (driveOk) {
+    setPasso('copia', 'run');
+    const rCopia = await salvarCopia(v, `laudo versão ${v.pdfVersao || 1}`);
+    setPasso('copia', rCopia.ok ? 'ok' : 'err', rCopia.ok ? 'na subpasta Dados' : erroDrive(rCopia.erro));
+  } else setPasso('copia', 'skip', 'sem Drive');
+  markDirty();
+  await flush();
+  S.busy = null;
+  render();
+  window.scrollTo(0, 0);
+}
+async function baixarPDF() {
+  const v = S.v;
+  if (!v) return;
+  if (!S.downloads) { toast('Esta tela não permite baixar arquivos. Abra o PDF pela pasta do Drive.'); return; }
+  let p = S.pdf && S.pdf.vid === v.id ? S.pdf : null;
+  if (!p) {
+    S.busy = { vid: v.id, titulo: 'Preparando o PDF para baixar', podeParar: false, passos: [{ k: 'img', txt: 'Preparando as fotos do laudo', st: 'run', det: '' }, { k: 'pdf', txt: 'Montando o PDF', st: 'wait', det: '' }] };
+    render();
+    try {
+      const blob = await gerarPDF(v, (k, det) => setPasso(k, 'run', det), (k) => setPasso(k, 'ok'));
+      p = S.pdf = { vid: v.id, blob, nome: v.drive && v.drive.pdfNome ? v.drive.pdfNome : nomePDF(v) };
+    } catch (e) { S.busy = null; render(); toast('Não consegui montar o PDF.'); return; }
+    S.busy = null; render();
+  }
+  try { await S.downloads.save({ filename: p.nome, data: p.blob }); }
+  catch (e) { if (e && e.code !== 'declined') toast('Não consegui baixar o PDF' + (e.code ? ` (${e.code})` : '') + '.'); }
+}
+async function excluirVistoria() {
+  const v = S.v;
+  if (!v || !S.db || !S.souDono) return;
+  clearTimeout(saveTimer);
+  try { await S.db.doc('vistorias/' + v.id).delete(); }
+  catch (e) { toast('Não consegui excluir a vistoria.'); return; }
+  try { localStorage.removeItem('ve-rascunho-' + v.id); } catch (_) {}
+  if (S.assets) for (const f of v.fotos) { if (!String(f.asset).startsWith('local-')) { try { await S.assets.delete(f.asset); } catch (_) {} } }
+  S.v = null; S.tela = 'home'; S.confirmar = null;
+  render();
+  toast('Vistoria excluída. A pasta no Drive continua lá.');
+}
+
+/* ---------- revisor do laudo ---------- */
+function checagens(v) {
+  const p = [];
+  if (!String(v.locador || '').trim()) p.push('Falta o nome do locador (proprietário). Preencha na fase Dados, em "Dados que vão no laudo".');
+  if (!String(v.locatario || '').trim()) p.push('Falta o nome do locatário (inquilino). Preencha na fase Dados.');
+  if (!String(v.vistoriador || '').trim()) p.push('Falta o nome do vistoriador. Preencha na fase Dados.');
+  if (!v.comodos.length) p.push('O relatório não tem nenhum cômodo.');
+  v.comodos.forEach((c) => {
+    if (!c.itens.length) p.push(`O cômodo "${c.nome}" está sem itens.`);
+    c.itens.forEach((i) => {
+      if (!i.estado) p.push(`${c.nome}, ${i.nome}: está sem estado.`);
+      if (String(i.descricao || '').trim().length < 12) p.push(`${c.nome}, ${i.nome}: a descrição está curta demais para um laudo.`);
+    });
+  });
+  if (v.tipo === 'saida' && entradaDe(v) && (!v.comparacao || v.comparacao.desatualizada)) p.push('A comparação com a vistoria de entrada está faltando ou desatualizada. Use "Comparar de novo".');
+  if (!String(v.parecer || '').trim()) p.push('As considerações finais estão vazias.');
+  if (v.fotos.some((f) => f.pendente)) p.push('Há fotos de um lote que ainda não foi processado.');
+  return p;
+}
+async function revisorClaude(v, signal) {
+  const linhas = cabecalhoPrompt(v);
+  linhas.push('',
+    'Você é o revisor de padronização dos laudos desta imobiliária. Revise o relatório abaixo antes de ele virar PDF e aponte só o que precisa mudar.',
+    'Regras do padrão:',
+    '1. Nomes de cômodos no padrão: Sala, Cozinha, Quarto 1, Quarto 2, Banheiro social, Banheiro da suíte, Área de serviço, Varanda, Garagem, Área externa, Medidores e chaves. A mesma coisa não pode aparecer com dois nomes.',
+    '2. Nomes de itens iguais em todos os cômodos: Piso, Paredes, Teto, Portas, Janelas, Tomadas e interruptores, Iluminação, Bancada, Pia, Torneira, Armários, Box, Vaso sanitário, Chuveiro, e assim por diante.',
+    '3. O estado precisa combinar com a descrição. Descrição com vazamento, trinca, infiltração, mofo ou quebra não pode estar como "bom" ou "novo".',
+    '4. Português formal de laudo: terceira pessoa, frases objetivas, ortografia correta, sem gírias, sem primeira pessoa, sem opinião, preço ou promessa.',
+    '5. "critico" deve ser true quando houver dano, vazamento, infiltração, mofo, quebra ou item faltando, e false nos outros casos.',
+    'Não invente informação. Se a descrição for curta, não complete com detalhes inventados: deixe como está.',
+    '', 'Relatório (JSON):', relatorioJSON(v.comodos, false),
+    '', 'Responda apenas com JSON neste formato:',
+    '{"resumo":"Uma ou duas frases sobre o laudo.","correcoes":[{"comodo":"Cozinha","item":"Torneira da pia","campo":"estado","valorNovo":"ruim","motivo":"A descrição fala em vazamento."}]}',
+    'Valores de "campo": "nome" (renomear o item), "estado", "descricao", "critico" ("true" ou "false") ou "comodo" (renomear o cômodo, com "item" vazio). Valores de estado: "novo", "bom", "regular", "ruim" ou "nao_se_aplica". Use uma lista vazia quando estiver tudo no padrão.');
+  const r = await S.sample.json(linhas.join('\n'), { signal, modelTier: 'default' });
+  if (!r || typeof r !== 'object' || !Array.isArray(r.correcoes)) throw { code: 'invalid_json' };
+  const campos = new Set(['nome', 'estado', 'descricao', 'critico', 'comodo']);
+  const correcoes = r.correcoes
+    .filter((x) => x && campos.has(x.campo) && String(x.valorNovo ?? '').trim() !== '')
+    .slice(0, 40)
+    .map((x) => {
+      const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
+      const it = c && x.item ? c.itens.find((ii) => norm(ii.nome) === norm(x.item)) : null;
+      let atual = '';
+      if (x.campo === 'comodo') atual = c ? c.nome : '';
+      else if (it) atual = x.campo === 'estado' ? estadoLabel(it.estado) : x.campo === 'critico' ? (it.critico ? 'sim' : 'não') : String(it[x.campo] || '');
+      return { comodo: String(x.comodo || ''), item: String(x.item || ''), campo: x.campo, valorNovo: String(x.valorNovo).trim(), motivo: String(x.motivo || ''), atual, valida: x.campo === 'comodo' ? !!c : !!it };
+    })
+    .filter((x) => x.valida && !(x.campo === 'estado' && !ESTADO_OK.has(x.valorNovo)));
+  return { resumo: String(r.resumo || '').trim(), correcoes };
+}
+async function revisarLaudo() {
+  const v = S.v;
+  if (!v || S.busy) return;
+  await flush();
+  S.aba = 'revisao'; S.revisao = null;
+  const pontos = checagens(v);
+  let rev = { resumo: '', correcoes: [] }, erro = '';
+  if (S.sample) {
+    const ctl = new AbortController();
+    S.busy = { vid: v.id, titulo: 'Revisando o laudo antes do PDF', ctl, podeParar: true, passos: [{ k: 'rev', txt: 'Revisor conferindo a padronização do laudo', st: 'run', det: 'costuma levar menos de um minuto' }] };
+    render();
+    try { rev = await revisorClaude(v, ctl.signal); }
+    catch (e) { if (e.code === 'cancelled') { S.busy = null; render(); return; } erro = erroClaude(e); }
+    S.busy = null;
+  }
+  if (!pontos.length && !rev.correcoes.length && !erro) { toast('O revisor não encontrou nada fora do padrão.'); return finalizar(); }
+  S.revisao = { vid: v.id, pontos, resumo: rev.resumo, correcoes: rev.correcoes, marcadas: rev.correcoes.map(() => true), erro };
+  render();
+  const el = document.getElementById('painel-revisao');
+  if (el) el.scrollIntoView({ block: 'start' });
+}
+function aplicarRevisao(aplicar) {
+  const v = S.v, r = S.revisao;
+  if (!v || !r || r.vid !== v.id) return;
+  if (aplicar) {
+    const ordem = r.correcoes.map((x, n) => ({ x, n })).filter((o) => r.marcadas[o.n]);
+    for (const { x } of ordem.filter((o) => o.x.campo !== 'comodo')) {
+      const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
+      const it = c && c.itens.find((ii) => norm(ii.nome) === norm(x.item));
+      if (!it) continue;
+      if (x.campo === 'estado') it.estado = x.valorNovo;
+      else if (x.campo === 'critico') it.critico = /^(true|sim|1)$/i.test(x.valorNovo);
+      else it[x.campo] = x.valorNovo;
+    }
+    for (const { x } of ordem.filter((o) => o.x.campo === 'comodo')) {
+      const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
+      if (c) c.nome = x.valorNovo;
+    }
+    markDirty();
+  }
+  S.revisao = null;
+  return finalizar();
+}
+function viewPainelRevisao() {
+  const r = S.revisao;
+  const nomeCampo = { nome: 'Nome do item', estado: 'Estado', descricao: 'Descrição', critico: 'Ponto de atenção', comodo: 'Nome do cômodo' };
+  const valor = (x) => (x.campo === 'estado' ? estadoLabel(x.valorNovo) : x.campo === 'critico' ? (/^(true|sim|1)$/i.test(x.valorNovo) ? 'sim' : 'não') : x.valorNovo);
+  const total = r.pontos.length + r.correcoes.length;
+  return `<section class="card" id="painel-revisao">
+    <p class="kicker"><span class="rule"></span>Revisor do laudo</p>
+    <h2>${total ? `O revisor encontrou ${plural(total, 'ponto', 'pontos')}` : 'Revisão do laudo'}</h2>
+    ${r.resumo ? `<p class="lede">${esc(r.resumo)}</p>` : ''}
+    ${r.erro ? aviso('O revisor automático não rodou agora. ' + r.erro + ' As checagens abaixo foram feitas pelo próprio app.') : ''}
+    ${r.pontos.length ? `<div class="stack"><p class="label">Para você resolver</p><ul class="bullets">${r.pontos.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+    ${r.correcoes.length ? `<div class="stack"><p class="label">Correções sugeridas (marque as que quer aplicar)</p><div class="cmp">${r.correcoes.map((x, n) => `<label class="cmp-row rev-row"><span class="chk"><input type="checkbox" data-rev="${n}" ${r.marcadas[n] ? 'checked' : ''}><b>${esc(x.campo === 'comodo' ? x.comodo : x.comodo + ' · ' + x.item)}</b></span><span class="de-para">${esc(nomeCampo[x.campo])}: ${esc(String(x.atual || 'vazio').slice(0, 160))} → ${esc(String(valor(x)).slice(0, 300))}</span>${x.motivo ? `<span class="sug">${esc(x.motivo)}</span>` : ''}</label>`).join('')}</div></div>` : ''}
+    <div class="stack">
+      ${r.correcoes.length ? '<button class="btn primary block" data-act="rev-aplicar">Aplicar as marcadas e gerar o PDF</button><button class="btn block" data-act="rev-sem">Gerar o PDF sem mudar nada</button>' : '<button class="btn primary block" data-act="rev-sem">Gerar o PDF assim mesmo</button>'}
+      <button class="btn ghost block" data-act="rev-voltar">Voltar e corrigir eu mesmo</button>
+    </div>
+  </section>`;
+}
+
+/* ---------- verificar conexões ---------- */
+async function verificarConexoes() {
+  if (S.verificando) return;
+  S.verificando = true; S.verif = []; render();
+  const add = (nome, ok, txt) => { S.verif.push({ nome, ok, txt }); const el = document.getElementById('verif'); if (el) el.outerHTML = viewVerif(); };
+  if (!S.db) add('Banco de vistorias', false, 'O app não conseguiu acessar o banco. Abra o link pelo Claude, com a sua conta logada.');
+  else {
+    try { await S.db.doc('config/geral').get(); add('Banco de vistorias', true, 'Funcionando. As vistorias ficam salvas aqui.'); }
+    catch (e) { add('Banco de vistorias', false, `Não consegui ler o banco agora (${(e && e.code) || 'erro'}). Tente de novo em instantes.`); }
+  }
+  add('Guardar fotos no app', !!S.assets, S.assets ? 'Funcionando.' : 'Este acesso não permite guardar fotos. Peça ao dono do app acesso de Editor.');
+  if (!S.sample) add('Claude dentro do app', false, 'O Claude não está disponível nesta tela. Abra o app pelo claude.ai ou pelo aplicativo do Claude.');
+  else {
+    try { await S.sample('Responda apenas com a palavra OK.', { modelTier: 'quick', cache: false }); add('Claude dentro do app', true, S.imgMax ? 'Funcionando, inclusive para olhar as fotos.' : 'Funcionando, mas sem olhar as fotos nesta tela; ele trabalha só com a fala.'); }
+    catch (e) { add('Claude dentro do app', false, erroClaude(e)); }
+  }
+  let driveOk = false;
+  if (!S.mcp) add('Google Drive', false, erroDrive({ code: 'sem_mcp' }));
+  else {
+    try { await drive('search_files', { query: `mimeType = '${FOLDER}' and title = 'teste de conexao do app de vistoria'`, pageSize: 1, excludeContentSnippets: true }); driveOk = true; add('Google Drive', true, 'Conectado.'); }
+    catch (e) { add('Google Drive', false, erroDrive(e)); }
+  }
+  if (driveOk) {
+    if (!S.cfg.driveRaizId) add('Pasta das vistorias', false, S.souDono ? 'Ainda não criada. Toque em "Criar a pasta agora", aqui em Configurações.' : erroDrive({ code: 'sem_pasta_definida' }));
+    else { try { await garantirRaiz(); add('Pasta das vistorias', true, `Acessível: ${nomeRaiz()}.`); } catch (e) { add('Pasta das vistorias', false, erroDrive(e)); } }
+  }
+  add('Baixar arquivos', true, S.downloads ? 'Funcionando.' : 'Esta tela não deixa baixar arquivos. Não tem problema: os laudos vão para o Drive normalmente.');
+  S.verificando = false;
+  const el = document.getElementById('verif');
+  if (el) el.outerHTML = viewVerif(); else render();
+  const b = document.querySelector('[data-act=verificar]'); if (b) { b.disabled = false; b.textContent = 'Verificar de novo'; }
+}
+function viewVerif() {
+  if (!S.verif) return '<div id="verif"></div>';
+  const falhas = S.verif.filter((x) => !x.ok).length;
+  return `<div id="verif" class="stack">
+    <ul class="passos">${S.verif.map((x) => `<li class="is-${x.ok ? 'ok' : 'err'}"><span class="ic ${x.ok ? 'ok' : 'err'}">${x.ok ? IC.check : IC.bang}</span><span class="tx">${esc(x.nome)}</span><span class="det">${esc(x.txt)}</span></li>`).join('')}${S.verificando ? '<li><span class="ic"><span class="spin"></span></span><span class="tx">Verificando</span></li>' : ''}</ul>
+    ${!S.verificando ? (falhas ? aviso(`${plural(falhas, 'item precisa', 'itens precisam')} de atenção. Siga a orientação ao lado de cada um e verifique de novo.`) : '<div class="msg ok"><p>Tudo funcionando. Pode fazer a primeira vistoria.</p></div>') : ''}
+  </div>`;
+}
+
+/* ---------- identidade visual ---------- */
+function viewPrevia() {
+  const c = S.cfg;
+  const capa = corCfg('corCapa'), corP = corCfg('corPrincipal');
+  const clara = lum(rgbDe(capa)) > 0.45;
+  const tit = tintaSobre(capa);
+  const ac = clara ? corParaFundoClaro(corP) : corParaFundoEscuro(corP);
+  const sub = hexDe(misturar(rgbDe(tit), rgbDe(capa), 0.35));
+  const logo = c.logoAsset ? fotoUrl(c.logoAsset) : '';
+  const marca = [c.empresa || 'Nome da imobiliária', c.creci].filter((x) => String(x || '').trim()).join('  ').toUpperCase();
+  return `<div class="previa" id="previa" style="background:${capa};color:${tit}" role="img" aria-label="Exemplo da capa do laudo">
+    <div class="previa-tx"><span class="previa-k" style="color:${ac}"><i style="background:${ac}"></i>${esc(marca)}</span><b>Laudo de vistoria de entrada</b><span style="color:${sub}">Rua Exemplo, 100, Centro</span></div>
+    ${logo ? `<img src="${esc(logo)}" alt="Logo da empresa">` : ''}
+  </div>`;
+}
+function atualizarPrevia() { const el = document.getElementById('previa'); if (el) el.outerHTML = viewPrevia(); }
+function viewIdentidade() {
+  const c = S.cfg, dono = S.souDono;
+  return `<section class="card" id="identidade">
+    <h3>Identidade visual</h3>
+    <p class="hint">A logo e as cores aparecem no topo do app e na capa do laudo em PDF. O resto do laudo fica em fundo branco, para imprimir e assinar.</p>
+    ${viewPrevia()}
+    <p class="hint">Acima, um exemplo de como fica a capa do laudo.</p>
+    <fieldset class="fs" ${dono ? '' : 'disabled'}>
+      <div class="field"><span class="label">Logo da empresa</span>
+        <div class="row">
+          <label class="btn sm">${c.logoAsset ? 'Trocar a logo' : 'Escolher a logo'}<input class="vh" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo></label>
+          ${c.logoAsset ? '<button type="button" class="btn ghost sm" data-act="tirar-logo">Tirar a logo</button>' : ''}
+        </div>
+        <p class="hint">O melhor é um arquivo PNG com fundo transparente. A logo fica em cima da cor da capa: se a capa for escura, use a versão clara da logo; se a capa for clara, a versão escura.</p></div>
+      ${viewCombos()}
+      <div class="grid2">
+        <div class="field"><label for="c-corp">Cor principal</label><input type="color" id="c-corp" data-cor="corPrincipal" value="${esc(corCfg('corPrincipal'))}"><p class="hint">Botões, títulos e destaques. Costuma ser a cor mais forte da logo.</p></div>
+        <div class="field"><label for="c-corc">Cor da capa do laudo</label><input type="color" id="c-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Fundo da faixa no topo do PDF e do app. Cores escuras costumam ficar mais elegantes.</p></div>
+      </div>
+    </fieldset>
+    ${dono ? '' : '<p class="hint">Só o dono do app muda a identidade visual.</p>'}
+  </section>`;
+}
+function avisoEmpresa() {
+  if (!S.pronto || !S.db || String(S.cfg.empresa || '').trim()) return '';
+  if (!S.souDono) return aviso('O dono do app ainda não configurou os dados da empresa.');
+  return '<div class="msg warn"><p>Falta configurar a empresa: nome, cidade e identidade visual. Eles aparecem nos laudos.</p><div class="row"><button class="btn sm" data-act="config">Configurar agora</button></div></div>';
+}
+async function trocarLogo(file) {
+  if (!S.souDono) return;
+  if (!S.assets) { toast('Este acesso não permite guardar arquivos no app.'); return; }
+  if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) { toast('Use um arquivo PNG, JPG, WEBP ou SVG.'); return; }
+  let blob = file, tipo = file.type;
+  try {
+    if (tipo !== 'image/svg+xml' && file.size > 1500000) {
+      const cv = await logoCanvas(file, 1200);
+      blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+      tipo = 'image/png';
+    }
+    const up = await S.assets.upload(blob, { type: tipo });
+    const antigo = S.cfg.logoAsset;
+    S.blobs.set(up.id, blob);
+    S.cfg.logoAsset = up.id;
+    try { S.coresSugeridas = await sugerirCores(blob); } catch (_) { S.coresSugeridas = null; }
+    if (S.tela === 'inicio' && S.coresSugeridas && S.coresSugeridas[0]) {
+      S.cfg.corPrincipal = S.coresSugeridas[0].principal; S.cfg.corCapa = S.coresSugeridas[0].capa; aplicarTema();
+    }
+    await salvarCfg(true);
+    if (antigo && antigo !== up.id) { try { await S.assets.delete(antigo); } catch (_) {} }
+    render();
+    toast('Logo salva. Ela já aparece no app e vai na capa dos próximos laudos.');
+  } catch (e) { toast('Não consegui salvar a logo: ' + erroFoto(e)); }
+}
+async function tirarLogo() {
+  if (!S.souDono || !S.cfg.logoAsset) return;
+  const antigo = S.cfg.logoAsset;
+  S.cfg.logoAsset = '';
+  await salvarCfg(true);
+  if (S.assets) { try { await S.assets.delete(antigo); } catch (_) {} }
+  render();
+  toast('Logo retirada.');
+}
+
+/* ---------- cores sugeridas pela logo ---------- */
+async function sugerirCores(blob) {
+  const cv = await logoCanvas(blob, 64);
+  const { data } = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
+  const baldes = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 200) continue;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const k = `${r >> 4},${g >> 4},${b >> 4}`;
+    const o = baldes.get(k) || { n: 0, r: 0, g: 0, b: 0, sat: 0 };
+    o.n++; o.r += r; o.g += g; o.b += b; o.sat += max ? (max - min) / max : 0;
+    baldes.set(k, o);
+  }
+  const cores = [...baldes.values()].map((o) => ({ rgb: [o.r / o.n, o.g / o.n, o.b / o.n].map(Math.round), n: o.n, sat: o.sat / o.n }));
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const vivas = cores.filter((c) => c.sat > 0.35 && lum(c.rgb) > 0.03 && lum(c.rgb) < 0.85).sort((a, b) => b.n * (0.5 + b.sat) - a.n * (0.5 + a.sat));
+  const escolhidas = [];
+  for (const c of vivas) { if (escolhidas.every((e) => dist(e.rgb, c.rgb) > 60)) escolhidas.push(c); if (escolhidas.length >= 2) break; }
+  const escura = cores.filter((c) => lum(c.rgb) < 0.06 && c.n > 4).sort((a, b) => b.n - a.n)[0];
+  const capaDe = (rgb) => (escura ? hexDe(escura.rgb) : hexDe(misturar(rgb, [0, 0, 0], 0.72)));
+  const combos = escolhidas.map((c) => ({ principal: hexDe(c.rgb), capa: capaDe(c.rgb) }));
+  if (!combos.length) combos.push({ principal: CFG_PADRAO.corPrincipal, capa: escura ? hexDe(escura.rgb) : CFG_PADRAO.corCapa });
+  if (combos.every((c) => c.capa.toLowerCase() !== '#14202b')) combos.push({ principal: combos[0].principal, capa: '#14202B' });
+  return combos.slice(0, 3);
+}
+function viewCombos() {
+  const cs = S.coresSugeridas;
+  if (!cs || !cs.length) return '';
+  return `<div class="stack"><p class="label">Cores sugeridas pela logo (toque para usar)</p><div class="row">${cs.map((c, i) => `<button type="button" class="combo" data-act="combo" data-i="${i}" aria-label="Usar a combinação ${i + 1}"><i style="background:${c.principal}"></i><i style="background:${c.capa}"></i>Combinação ${i + 1}</button>`).join('')}</div></div>`;
+}
+function aplicarCombo(i) {
+  const c = S.coresSugeridas && S.coresSugeridas[i];
+  if (!c || !S.souDono) return;
+  S.cfg.corPrincipal = c.principal; S.cfg.corCapa = c.capa;
+  aplicarTema(); salvarCfg(true); render();
+}
+
+/* ---------- boas-vindas: configuração na primeira abertura ---------- */
+function precisaInicio() {
+  return S.souDono && !!S.db && (!String(S.cfg.empresa || '').trim() || S.cfg.configurado === false);
+}
+function viewInicio() {
+  const c = S.cfg;
+  const concluido = c.configurado === true;
+  const tudoOk = S.verif && !S.verificando && S.verif.every((x) => x.ok);
+  return `<main class="shell">
+    <section class="hero">
+      <p class="kicker"><span class="rule"></span>Primeira vez</p>
+      <h1>Vamos deixar o app com a <em>cara da sua imobiliária</em></h1>
+      <p class="lede">Leva um minuto. Dá para mudar tudo depois, na engrenagem.</p>
+    </section>
+    <section class="card">
+      <p class="kicker quiet"><span class="rule"></span>1 · Empresa</p>
+      <div class="field"><label for="w-emp">Nome da imobiliária, do jeito que vai no laudo</label><input id="w-emp" data-cfg="empresa" value="${esc(c.empresa)}" autocomplete="organization"></div>
+      <div class="grid2">
+        <div class="field"><label for="w-cid">Cidade e estado</label><input id="w-cid" data-cfg="cidade" value="${esc(c.cidade)}" placeholder="Ex.: Juiz de Fora - MG"></div>
+        <div class="field"><label for="w-creci">CRECI (se tiver)</label><input id="w-creci" data-cfg="creci" value="${esc(c.creci)}"></div>
+      </div>
+    </section>
+    <section class="card">
+      <p class="kicker quiet"><span class="rule"></span>2 · Logo e cores</p>
+      ${viewPrevia()}
+      <div class="row">
+        <label class="btn">${c.logoAsset ? 'Trocar a logo' : 'Escolher a logo'}<input class="vh" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo></label>
+        ${c.logoAsset ? '<button type="button" class="btn ghost sm" data-act="tirar-logo">Tirar a logo</button>' : ''}
+      </div>
+      <p class="hint">Pode ser uma foto ou imagem da galeria do celular. O ideal é PNG com fundo transparente. Ao escolher, o app sugere as cores a partir da logo.</p>
+      ${viewCombos()}
+      <div class="grid2">
+        <div class="field"><label for="w-corp">Cor principal</label><input type="color" id="w-corp" data-cor="corPrincipal" value="${esc(corCfg('corPrincipal'))}"><p class="hint">Botões e destaques.</p></div>
+        <div class="field"><label for="w-corc">Cor da capa do laudo</label><input type="color" id="w-corc" data-cor="corCapa" value="${esc(corCfg('corCapa'))}"><p class="hint">Fundo da faixa da capa. A logo precisa aparecer bem em cima dela.</p></div>
+      </div>
+    </section>
+    <section class="card">
+      <p class="kicker quiet"><span class="rule"></span>3 · Google Drive</p>
+      <p class="hint">Ao concluir, o app cria no seu Google Drive a pasta "${esc(nomeRaizPadrao())}". Cada vistoria vira uma pasta dentro dela, com o endereço do imóvel e a data, e ali ficam as fotos e o laudo em PDF.</p>
+      <div id="msg-inicio">${viewMsg('inicio')}</div>
+      ${S.cfgOcupado ? '<div class="loading-line"><span class="spin"></span>Criando a pasta no Google Drive</div>' : ''}
+      <button class="btn primary block" data-act="concluir-inicio" ${S.cfgOcupado || S.verificando ? 'disabled' : ''}>${concluido ? 'Verificar de novo' : 'Concluir e verificar'}</button>
+      ${viewVerif()}
+      ${concluido && !S.verificando ? `<button class="btn ${tudoOk ? 'primary' : ''} block" data-act="comecar">${tudoOk ? 'Começar a usar' : 'Começar a usar mesmo assim'}</button>` : ''}
+    </section>
+  </main>`;
+}
+async function concluirInicio() {
+  if (!S.souDono || S.cfgOcupado || S.verificando) return;
+  const falta = [];
+  if (!String(S.cfg.empresa || '').trim()) falta.push('o nome da imobiliária');
+  if (!String(S.cfg.cidade || '').trim()) falta.push('a cidade');
+  if (falta.length) { setMsg('inicio', `Falta ${listaPt(falta)}.`, 'warn'); return; }
+  S.msg = null; S.cfgOcupado = true; render();
+  S.cfg.configurado = true;
+  await salvarCfg(true);
+  if (S.mcp) { try { await garantirRaiz(); } catch (_) {} }
+  S.cfgOcupado = false;
+  await verificarConexoes();
+  render();
+}
+
+/* ---------- logo ---------- */
+async function logoCanvas(blob, max) {
+  const im = await abrirImagem(blob);
+  const w0 = im.w || 600, h0 = im.h || 300;
+  const k = Math.min(1, max / Math.max(w0, h0));
+  const w = Math.max(1, Math.round(w0 * k)), h = Math.max(1, Math.round(h0 * k));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(im.el, 0, 0, w, h); im.fim();
+  return cv;
+}
+async function logoPNG(blob) {
+  const cv = await logoCanvas(blob, 900);
+  return { data: cv.toDataURL('image/png'), w: cv.width, h: cv.height };
+}
+
+/* ---------- PDF ---------- */
+function pdfTexto(s) {
+  return String(s ?? '')
+    .replace(/[‘’‚′]/g, "'").replace(/[“”„″]/g, '"')
+    .replace(/[–—−]/g, '-').replace(/…/g, '...').replace(/[•●▪‣]/g, '-')
+    .replace(/[   ]/g, ' ').replace(/→/g, '>').replace(/×/g, 'x')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '');
+}
+async function gerarPDF(v, progresso, pronto) {
+  const { jsPDF } = window.jspdf;
+  const cfg = S.cfg;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  const W = 210, H = 297, M = 16, CW = W - 2 * M, BASE = H - 18;
+  const corP = corCfg('corPrincipal'), corC = corCfg('corCapa');
+  const capaClara = lum(rgbDe(corC)) > 0.45;
+  const tituloCapa = rgbDe(tintaSobre(corC));
+  const C = {
+    capa: rgbDe(corC), acento: rgbDe(corParaFundoClaro(corP)),
+    acentoCapa: rgbDe(capaClara ? corParaFundoClaro(corP) : corParaFundoEscuro(corP)),
+    tituloCapa, subCapa: misturar(tituloCapa, rgbDe(corC), 0.35),
+    tinta: [22, 30, 38], cinza: [96, 106, 117], linha: [218, 224, 230], fundo: [242, 245, 248],
+  };
+  const COR_EST = { novo: [19, 128, 86], bom: [19, 128, 86], regular: [176, 112, 18], ruim: [190, 72, 40], nao_se_aplica: [120, 132, 125], '': [120, 132, 125] };
+  const T = pdfTexto;
+  const tipoNome = v.tipo === 'saida' ? 'saída' : 'entrada';
+  const lh = (size, f) => size * 0.3528 * (f || 1.38);
+  let y = 0;
+  function fonte(estilo, tam, cor) { doc.setFont('helvetica', estilo); doc.setFontSize(tam); doc.setTextColor(...(cor || C.tinta)); }
+  function cabecalhoInterno() {
+    doc.setDrawColor(...C.acento); doc.setLineWidth(0.5); doc.line(M, 12, M + 8, 12);
+    fonte('bold', 7.5, C.cinza);
+    doc.text(T(`LAUDO DE VISTORIA DE ${tipoNome.toUpperCase()}`), M + 11, 12.9, { charSpace: 0.3 });
+    fonte('normal', 7.5, C.cinza);
+    const end = doc.splitTextToSize(T(v.endereco), CW - 70)[0] || '';
+    doc.text(end, W - M, 12.9, { align: 'right' });
+  }
+  function novaPagina() { doc.addPage(); cabecalhoInterno(); y = 22; }
+  function espaco(h) { if (y + h > BASE) novaPagina(); }
+  function paragrafo(texto, o) {
+    o = o || {};
+    const tam = o.tam || 10;
+    fonte(o.estilo || 'normal', tam, o.cor);
+    const linhas = doc.splitTextToSize(T(texto), o.w || CW);
+    const l = lh(tam);
+    for (const ln of linhas) { espaco(l); doc.text(ln, o.x || M, y + l * 0.74); y += l; }
+    y += o.depois === undefined ? 1.5 : o.depois;
+  }
+  function secao(titulo, kicker) {
+    espaco(38);
+    y += 5;
+    doc.setDrawColor(...C.acento); doc.setLineWidth(0.6); doc.line(M, y, M + 9, y);
+    if (kicker) { fonte('bold', 7.5, C.acento); doc.text(T(kicker.toUpperCase()), M + 12, y + 1, { charSpace: 0.4 }); }
+    y += 7;
+    fonte('bold', 14, C.tinta); doc.text(T(titulo), M, y);
+    y += 3;
+    doc.setDrawColor(...C.linha); doc.setLineWidth(0.25); doc.line(M, y, W - M, y);
+    y += 5;
+  }
+  function rotuloDireita(txt, yy) {
+    const cs = 0.3;
+    const w = doc.getTextWidth(txt) + cs * Math.max(0, txt.length - 1);
+    doc.text(txt, W - M - w, yy, { charSpace: cs });
+  }
+
+  /* fotos */
+  const legenda = new Map();
+  v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((code) => { if (!legenda.has(code)) legenda.set(code, `${c.nome}, ${i.nome}`); })));
+  const usados = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((code) => { if (!usados.includes(code)) usados.push(code); })));
+  (v.fotosSoltas || []).forEach((code) => { if (!usados.includes(code)) usados.push(code); });
+  const imgs = new Map();
+  let k = 0;
+  for (const code of usados) {
+    const f = fotoPorCodigo(v, code);
+    k++;
+    progresso && progresso('img', `${k} de ${usados.length}`);
+    if (!f) continue;
+    try {
+      const b = await pegarBlob(f.asset);
+      const r = await reduzir(b, 1100, 0.72);
+      imgs.set(code, { data: await paraDataURL(r.blob), w: r.w, h: r.h });
+    } catch (_) {}
+  }
+  let logo = null;
+  if (cfg.logoAsset) { try { logo = await logoPNG(await pegarBlob(cfg.logoAsset)); } catch (_) {} }
+  pronto && pronto('img');
+  progresso && progresso('pdf', '');
+
+  function grade(codes) {
+    const cols = 3, gap = 4, cw = (CW - gap * (cols - 1)) / cols, ih = cw * 0.75, alt = ih + 9;
+    for (let i = 0; i < codes.length; i += cols) {
+      espaco(alt);
+      for (let j = 0; j < cols && i + j < codes.length; j++) {
+        const code = codes[i + j];
+        const x = M + j * (cw + gap);
+        doc.setFillColor(...C.fundo); doc.rect(x, y, cw, ih, 'F');
+        const im = imgs.get(code);
+        if (im) {
+          const r = Math.min(cw / im.w, ih / im.h);
+          const w = im.w * r, h = im.h * r;
+          doc.addImage(im.data, 'JPEG', x + (cw - w) / 2, y + (ih - h) / 2, w, h, 'f-' + code, 'FAST');
+        } else { fonte('normal', 7.5, C.cinza); doc.text('Foto indisponível', x + cw / 2, y + ih / 2, { align: 'center' }); }
+        fonte('bold', 7.5, C.tinta); doc.text(code, x, y + ih + 4);
+        const leg = legenda.get(code);
+        if (leg) { fonte('normal', 7.5, C.cinza); doc.text(doc.splitTextToSize(T(leg), cw - 15)[0] || '', x + 14.5, y + ih + 4); }
+      }
+      y += alt;
+    }
+  }
+
+  /* capa */
+  doc.setFillColor(...C.capa); doc.rect(0, 0, W, 58, 'F');
+  const marca = [cfg.empresa, cfg.creci].filter((s) => String(s || '').trim()).join('  ');
+  if (marca) {
+    doc.setDrawColor(...C.acentoCapa); doc.setLineWidth(0.7); doc.line(M, 17, M + 10, 17);
+    fonte('bold', 8, C.acentoCapa);
+    doc.text(doc.splitTextToSize(T(marca.toUpperCase()), CW - 70)[0] || '', M + 13, 18.1, { charSpace: 0.5 });
+  }
+  fonte('bold', 23, C.tituloCapa); doc.text(T(`Laudo de vistoria de ${tipoNome}`), M, 32);
+  fonte('normal', 10.5, C.subCapa);
+  const endL = doc.splitTextToSize(T(v.endereco), CW - (logo ? 58 : 10)).slice(0, 2);
+  endL.forEach((ln, i) => doc.text(ln, M, 40.5 + i * 5));
+  if (logo) {
+    const kl = Math.min(46 / logo.w, 22 / logo.h);
+    const lw = logo.w * kl, lhh = logo.h * kl;
+    doc.addImage(logo.data, 'PNG', W - M - lw, 31 - lhh / 2, lw, lhh, 'logo', 'FAST');
+  }
+  y = 68;
+
+  const dados = [
+    ['Imóvel', v.endereco], ['Descrição', v.descricao], ['Data da vistoria', dataLonga(v.data)],
+    ['Tipo', v.tipo === 'saida' ? 'Vistoria de saída (devolução do imóvel)' : 'Vistoria de entrada (entrega do imóvel)'],
+    ['Código do imóvel', v.codigo], ['Locador', v.locador], ['Locatário', v.locatario], ['Vistoriador', v.vistoriador],
+  ];
+  const e = v.tipo === 'saida' ? entradaDe(v) : null;
+  if (e) dados.push(['Vistoria de entrada', `${dataLonga(e.data)}`]);
+  for (const [rot, val] of dados) {
+    if (!String(val || '').trim()) continue;
+    fonte('bold', 7.5, C.cinza); doc.text(T(rot.toUpperCase()), M, y + 3.4, { charSpace: 0.3 });
+    fonte('normal', 10, C.tinta);
+    const ls = doc.splitTextToSize(T(val), CW - 42);
+    ls.forEach((ln, i) => doc.text(ln, M + 42, y + 3.6 + i * lh(10)));
+    y += Math.max(1, ls.length) * lh(10) + 2.6;
+    doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, y - 1.2, W - M, y - 1.2);
+    y += 1.2;
+  }
+  const nItens = v.comodos.reduce((a, c) => a + c.itens.length, 0);
+  const criticos = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => { if (i.critico || i.estado === 'ruim') criticos.push({ c, i }); }));
+  y += 4;
+  fonte('normal', 9.5, C.cinza);
+  doc.text(T(`${plural(v.comodos.length, 'cômodo', 'cômodos')}  |  ${plural(nItens, 'item', 'itens')}  |  ${plural(v.fotos.length, 'foto', 'fotos')}  |  ${plural(criticos.length, 'ponto de atenção', 'pontos de atenção')}`), M, y);
+  y += 5.5;
+  if (v.drive && v.drive.pastaUrl) {
+    fonte('normal', 9, C.cinza); doc.text('Fotos originais em alta resolução:', M, y);
+    fonte('bold', 9, C.acento); doc.textWithLink(T('pasta da vistoria no Google Drive'), M + 50, y, { url: v.drive.pastaUrl });
+    y += 5;
+  }
+
+  if (criticos.length) {
+    secao('Pontos de atenção', 'Resumo');
+    for (const { c, i } of criticos) {
+      espaco(12);
+      fonte('bold', 9.5, C.tinta);
+      const tit = T(`${c.nome}, ${i.nome}`);
+      doc.text(tit, M, y + 3.4);
+      fonte('bold', 8, COR_EST[i.estado] || COR_EST['']);
+      rotuloDireita(T(estadoLabel(i.estado).toUpperCase()), y + 3.4);
+      y += lh(9.5);
+      if (i.descricao) paragrafo(i.descricao, { tam: 9, cor: C.cinza, depois: 2 });
+      else y += 2;
+    }
+  }
+
+  if (v.tipo === 'saida' && v.comparacao && v.comparacao.itens && v.comparacao.itens.length) {
+    secao('Comparativo com a vistoria de entrada', e ? `Entrada de ${dataCurta(e.data)}` : 'Comparativo');
+    if (v.comparacao.resumo) paragrafo(v.comparacao.resumo, { tam: 9.5, depois: 3 });
+    const ordem = ['dano', 'faltando', 'desgaste_natural', 'avaliar', 'novo'];
+    const comMudanca = v.comparacao.itens.filter((x) => x.situacao !== 'sem_alteracao').sort((a, b) => ordem.indexOf(a.situacao) - ordem.indexOf(b.situacao));
+    for (const x of comMudanca) {
+      espaco(16);
+      fonte('bold', 9.5, C.tinta); doc.text(T(`${x.comodo}, ${x.item}`), M, y + 3.4);
+      const corSit = ['dano', 'faltando'].includes(x.situacao) ? COR_EST.ruim : ['desgaste_natural', 'avaliar'].includes(x.situacao) ? COR_EST.regular : COR_EST.bom;
+      fonte('bold', 8, corSit); rotuloDireita(T(sitLabel(x.situacao).toUpperCase()), y + 3.4);
+      y += lh(9.5);
+      fonte('normal', 8.5, C.cinza);
+      doc.text(T(`Entrada: ${x.entrada ? estadoLabel(x.entrada) : 'não registrado'}   |   Saída: ${x.saida ? estadoLabel(x.saida) : 'não registrado'}`), M, y + 3);
+      y += lh(8.5) + 0.5;
+      if (x.explicacao) paragrafo(x.explicacao, { tam: 9, depois: 0.5 });
+      if (x.sugestao) paragrafo('Sugestão: ' + x.sugestao, { tam: 8.5, estilo: 'italic', cor: C.cinza, depois: 2.5 });
+      else y += 2;
+    }
+    const iguais = v.comparacao.itens.filter((x) => x.situacao === 'sem_alteracao');
+    if (iguais.length) paragrafo('Sem alteração em relação à entrada: ' + iguais.map((x) => `${x.comodo}, ${x.item}`).join('; ') + '.', { tam: 8.5, cor: C.cinza, depois: 2 });
+  }
+
+  for (const c of v.comodos) {
+    secao(c.nome, 'Cômodo');
+    for (const i of c.itens) {
+      fonte('normal', 9.5);
+      const dl = i.descricao ? doc.splitTextToSize(T(i.descricao), CW).length : 0;
+      espaco(Math.min(60, lh(10) + dl * lh(9.5) + 9));
+      const cor = COR_EST[i.estado] || COR_EST[''];
+      doc.setFillColor(...cor); doc.rect(M, y + 1, 1.1, 3.6, 'F');
+      fonte('bold', 10, C.tinta);
+      doc.text(doc.splitTextToSize(T(i.nome), CW - 45)[0] || '', M + 3.5, y + 4);
+      fonte('bold', 8, cor);
+      rotuloDireita(T((i.critico ? 'Atenção  |  ' : '') + estadoLabel(i.estado)).toUpperCase(), y + 4);
+      y += lh(10) + 1;
+      if (i.descricao) paragrafo(i.descricao, { tam: 9.5, depois: 0.5 });
+      if (i.fotos.length) { fonte('normal', 8, C.cinza); espaco(5); doc.text(T('Fotos: ' + i.fotos.join(', ')), M, y + 3); y += 4.5; }
+      y += 1.5;
+      doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, y, W - M, y);
+      y += 2.5;
+    }
+    if (c.observacoes) paragrafo('Observações: ' + c.observacoes, { tam: 9, estilo: 'italic', cor: C.cinza, depois: 3 });
+    const codes = [];
+    c.itens.forEach((i) => i.fotos.forEach((f) => { if (!codes.includes(f)) codes.push(f); }));
+    if (codes.length) { y += 2; grade(codes); }
+  }
+
+  if ((v.fotosSoltas || []).length) { secao('Outras fotos da vistoria', 'Fotos'); grade(v.fotosSoltas); }
+  if (String(v.observacoesGerais || '').trim()) { secao('Observações gerais'); paragrafo(v.observacoesGerais, { tam: 10 }); }
+  if (String(v.parecer || '').trim()) { secao('Considerações finais'); paragrafo(v.parecer, { tam: 10 }); }
+
+  const declaracao = v.tipo === 'saida' ? cfg.declaracaoSaida : cfg.declaracaoEntrada;
+  fonte('normal', 9.5);
+  const blocoAssinaturas = 25 + doc.splitTextToSize(T(declaracao), CW).length * lh(9.5) + 3 + lh(9.5) + 2 + 60;
+  if (blocoAssinaturas < BASE - 22) espaco(blocoAssinaturas);
+  secao('Declaração e assinaturas');
+  paragrafo(declaracao, { tam: 9.5, depois: 3 });
+  paragrafo(`${String(cfg.cidade || '').trim() ? cfg.cidade + ', ' : ''}${dataLonga(v.data)}.`, { tam: 9.5, depois: 2 });
+  espaco(58);
+  y += 16;
+  const colW = (CW - 14) / 2;
+  function assinatura(x, yy, papel, nome) {
+    doc.setDrawColor(...C.tinta); doc.setLineWidth(0.3); doc.line(x, yy, x + colW, yy);
+    fonte('bold', 9, C.tinta); doc.text(T(nome || ' '), x, yy + 4.6);
+    fonte('normal', 8, C.cinza); doc.text(T(papel), x, yy + (nome ? 8.8 : 4.6));
+  }
+  assinatura(M, y, 'Locador', v.locador);
+  assinatura(M + colW + 14, y, 'Locatário', v.locatario);
+  y += 24;
+  assinatura(M, y, String(cfg.empresa || '').trim() ? `Vistoriador, ${cfg.empresa}` : 'Vistoriador', v.vistoriador);
+  y += 12;
+
+  const total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, H - 12.5, W - M, H - 12.5);
+    fonte('normal', 7.5, C.cinza);
+    const rod = [cfg.empresa, cfg.creci, cfg.contato].filter((s) => String(s || '').trim()).join('  |  ');
+    doc.text(T(rod), M, H - 8.5);
+    doc.text(`Página ${p} de ${total}`, W - M, H - 8.5, { align: 'right' });
+  }
+  return doc.output('blob');
+}
+
+/* ---------- mensagens ---------- */
+function setMsg(onde, texto, tom, fixa) {
+  S.msg = { onde, texto, tom: tom || 'warn', fixa: !!fixa };
+  const el = document.getElementById('msg-' + onde);
+  if (el) el.innerHTML = viewMsg(onde);
+  else render();
+}
+function viewMsg(onde) {
+  if (!S.msg || S.msg.onde !== onde) return '';
+  return `<div class="msg ${esc(S.msg.tom)}" role="status"><p>${esc(S.msg.texto)}</p></div>`;
+}
+let toastTimer = null;
+function toast(texto, acao, act) {
+  const root = document.getElementById('toast-root');
+  if (!root) return;
+  root.innerHTML = `<div class="toast" role="status"><span class="grow">${esc(texto)}</span>${acao ? `<button class="btn sm" data-act="${esc(act)}">${esc(acao)}</button>` : ''}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { root.innerHTML = ''; }, acao ? 9000 : 4500);
+}
+function aviso(texto, tom) { return `<div class="msg ${tom || 'warn'}"><p>${esc(texto)}</p></div>`; }
+
+/* ---------- telas ---------- */
+function viewTopo() {
+  const emVistoria = S.tela === 'vistoria' && S.v && !S.v._novo;
+  return `<header class="top"><div class="top-in">
+    ${S.tela !== 'home' && S.tela !== 'inicio' ? `<button class="icon-btn" data-act="home" aria-label="Voltar para a lista">${IC.back}</button>` : ''}
+    <div class="brand">${marcaHTML(26)}<span>${esc(nomeApp())}</span></div>
+    <span class="save${S.save === 'error' || S.save === 'offline' ? ' is-bad' : ''}" id="save" aria-live="polite">${emVistoria ? esc(saveTexto()) : ''}</span>
+    ${S.tela === 'home' ? `<button class="icon-btn" data-act="config" aria-label="Configurações">${IC.gear}</button>` : ''}
+  </div></header>`;
+}
+function avisoAmbiente() {
+  if (S.semRuntime) return aviso('Abra este app pelo link no claude.ai, com a sua conta logada. Fora do Claude ele não guarda vistorias, não chama o Claude e não fala com o Google Drive.');
+  if (S.pronto && !S.db) return aviso('Não consegui acessar o banco de vistorias. Entre na sua conta do Claude e abra o link de novo.');
+  if (S.podeEscrever === false) return aviso('Seu acesso a este app é só de leitura. Para fazer vistorias, peça acesso de edição a quem compartilhou o link.');
+  return '';
+}
+function faseTexto(v) {
+  if (v.status === 'concluida') return 'Laudo pronto';
+  if (v.fase === 'revisao') return 'Em revisão';
+  if (v.fase === 'laudo') return 'Gerando laudo';
+  return v.lotes && v.lotes.length ? `${plural(v.lotes.length, 'lote', 'lotes')} processados` : 'Aguardando o lote 1';
+}
+function viewHome() {
+  const visiveis = S.lista.filter((v) => !v.arquivada);
+  const arquivadas = S.lista.filter((v) => v.arquivada);
+  const minhas = visiveis.filter((v) => S.meuId && v.criadoPor === S.meuId);
+  const ativas = visiveis.filter((v) => v.status !== 'concluida');
+  const prontas = visiveis.filter((v) => v.status === 'concluida');
+  if (S.filtro === 'arquivadas' && !arquivadas.length) S.filtro = 'todas';
+  const lista = { todas: visiveis, minhas, andamento: ativas, concluidas: prontas, arquivadas }[S.filtro] || visiveis;
+  let corpo;
+  if (!S.pronto || (S.db && !S.listaCarregada)) corpo = `<div class="loading-line"><span class="spin"></span>Carregando as vistorias</div>`;
+  else if (!S.lista.length) {
+    corpo = `<div class="empty">
+      <p class="muted">Nenhuma vistoria por aqui ainda. Toque em Nova vistoria para começar. O passo a passo é este:</p>
+      <ol class="phases">
+        <li><b>Dados do imóvel</b><span>Endereço, descrição e data. O app cria a pasta da vistoria no Google Drive.</span></li>
+        <li><b>Lotes de fotos com fala</b><span>Até 20 fotos por lote. Você fala o que viu pelo microfone do teclado e o Claude organiza por cômodo.</span></li>
+        <li><b>Revisão</b><span>Você confere tudo, corrige o que precisar e, na saída, vê a comparação com a entrada.</span></li>
+        <li><b>Laudo em PDF</b><span>O PDF com fotos e espaço para assinaturas vai para a pasta da vistoria no Drive.</span></li>
+      </ol></div>`;
+  } else if (!lista.length) corpo = `<p class="muted">Nada nesta lista.</p>`;
+  else {
+    corpo = `<ul class="vlist">${lista.map((v) => `<li><button class="vrow" data-act="abrir" data-id="${esc(v.id)}">
+      <span class="k">Vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'}${v.codigo ? ' · ' + esc(v.codigo) : ''}</span>
+      <span class="t">${esc(v.endereco || 'Sem endereço')}</span>
+      <span class="d">${esc(dataCurta(v.data))}</span>
+      <span class="m"><i class="sq ${v.status === 'concluida' ? 'concluida' : v.fase === 'revisao' ? 'revisao' : 'andamento'}"></i>${v.arquivada ? 'Arquivada · ' : ''}${esc(faseTexto(v))} · ${plural((v.comodos || []).length, 'cômodo', 'cômodos')} · ${plural((v.fotos || []).length, 'foto', 'fotos')}${v.criadoPor ? ` · por <span data-autor="${esc(v.criadoPor)}">${esc(S.nomes[v.criadoPor] || '...')}</span>` : ''}</span>
+    </button></li>`).join('')}</ul>`;
+  }
+  return `<main class="shell">
+    ${avisoAmbiente()}
+    ${S.listaErro ? aviso('Não consegui carregar a lista de vistorias. Recarregue a página.', 'bad') : ''}
+    ${avisoEmpresa()}
+    <section class="hero">
+      <p class="kicker"><span class="rule"></span>${esc(S.cfg.empresa || 'Aluguel')} · Vistorias</p>
+      <h1>Vistorias de <em>entrada e saída</em></h1>
+      <p class="lede">Fotos em lotes, fala ditada no celular, o Claude organiza por cômodo e o laudo em PDF vai para a pasta da vistoria no Google Drive.</p>
+      <div class="row"><button class="btn primary" data-act="nova" ${S.db && S.podeEscrever !== false ? '' : 'disabled'}>Nova vistoria</button><button class="btn ghost" data-act="onde">Onde ficam os dados</button></div>
+    </section>
+    ${S.lista.length ? `<nav class="tabs" role="tablist" aria-label="Filtrar vistorias">
+      <button role="tab" aria-selected="${S.filtro === 'todas'}" data-act="filtro" data-val="todas">Todas<span class="c">${visiveis.length}</span></button>
+      ${S.meuId ? `<button role="tab" aria-selected="${S.filtro === 'minhas'}" data-act="filtro" data-val="minhas">Minhas<span class="c">${minhas.length}</span></button>` : ''}
+      <button role="tab" aria-selected="${S.filtro === 'andamento'}" data-act="filtro" data-val="andamento">Em andamento<span class="c">${ativas.length}</span></button>
+      <button role="tab" aria-selected="${S.filtro === 'concluidas'}" data-act="filtro" data-val="concluidas">Concluídas<span class="c">${prontas.length}</span></button>
+      ${arquivadas.length ? `<button role="tab" aria-selected="${S.filtro === 'arquivadas'}" data-act="filtro" data-val="arquivadas">Arquivadas<span class="c">${arquivadas.length}</span></button>` : ''}
+    </nav>` : ''}
+    ${corpo}
+  </main>`;
+}
+function viewPassos() {
+  const v = S.v;
+  const alcancada = v._novo ? 0 : Math.max(1, FASES.indexOf(v.fase));
+  return `<ol class="steps" aria-label="Fases da vistoria">${FASES.map((f, i) => {
+    const on = S.aba === f, done = i < alcancada && !on, pode = !v._novo && i <= alcancada && !S.busy;
+    return `<li><button data-act="aba" data-val="${f}" class="${on ? 'is-on' : done ? 'is-done' : ''}" ${pode ? '' : 'disabled'} ${on ? 'aria-current="step"' : ''}><span class="n">${pad(i + 1)}</span><span class="t">${FASE_NOME[f]}</span></button></li>`;
+  }).join('')}</ol>`;
+}
+function viewBusy() {
+  const b = S.busy;
+  if (!b) return '<div id="busy"></div>';
+  const ic = { wait: '', run: '<span class="spin"></span>', ok: IC.check, err: IC.bang, skip: '' };
+  return `<section class="card" id="busy" aria-live="polite">
+    <p class="kicker"><span class="rule"></span>Trabalhando</p>
+    <h2>${esc(b.titulo)}</h2>
+    <ul class="passos">${b.passos.map((p) => `<li class="is-${p.st}"><span class="ic ${p.st === 'run' ? '' : p.st}">${ic[p.st] || ''}</span><span class="tx">${esc(p.txt)}</span>${p.det ? `<span class="det">${esc(p.det)}</span>` : ''}</li>`).join('')}</ul>
+    ${b.podeParar && b.ctl ? '<div><button class="btn" data-act="parar">Parar</button></div>' : '<p class="hint">Deixe esta tela aberta até terminar.</p>'}
+  </section>`;
+}
+function viewDados() {
+  const v = S.v;
+  const entradas = S.lista.filter((x) => x.tipo === 'entrada' && x.id !== v.id);
+  const travado = !v._novo && v.status === 'concluida';
+  return `<section class="card">
+    <p class="kicker"><span class="rule"></span>Fase 1 · Dados do imóvel</p>
+    <h2>${v._novo ? 'Boas-vindas. Para começar, preciso de três dados.' : 'Dados da vistoria'}</h2>
+    <div class="field"><label for="f-end">Endereço completo do imóvel</label>
+      <input id="f-end" data-bind="endereco" value="${esc(v.endereco)}" placeholder="Rua, número, apartamento, bairro, cidade" autocomplete="off"></div>
+    <div class="field"><label for="f-desc">Descrição breve</label>
+      <input id="f-desc" data-bind="descricao" value="${esc(v.descricao)}" placeholder="Ex.: Apartamento 3 quartos, desocupado" autocomplete="off"></div>
+    <div class="grid2">
+      <div class="field"><label for="f-data">Data da vistoria</label><input id="f-data" type="date" data-bind="data" value="${esc(v.data)}"></div>
+      <div class="field"><span class="label" id="l-tipo">Tipo de vistoria</span>
+        <div class="seg" role="radiogroup" aria-labelledby="l-tipo">
+          <button type="button" role="radio" aria-checked="${v.tipo === 'entrada'}" data-act="tipo" data-val="entrada" ${v._novo ? '' : 'disabled'}>Entrada</button>
+          <button type="button" role="radio" aria-checked="${v.tipo === 'saida'}" data-act="tipo" data-val="saida" ${v._novo ? '' : 'disabled'}>Saída</button>
+        </div></div>
+    </div>
+    ${v.tipo === 'saida' ? `<div class="field"><label for="f-ent">Vistoria de entrada deste imóvel</label>
+      <select id="f-ent" data-sel="entradaId">
+        <option value="">Sem vistoria de entrada no app</option>
+        ${entradas.map((x) => `<option value="${esc(x.id)}" ${x.id === v.entradaId ? 'selected' : ''}>${esc(dataCurta(x.data))} · ${esc(x.endereco)}</option>`).join('')}
+      </select>
+      <p class="hint">Com a entrada escolhida, o Claude usa os mesmos nomes de cômodos e compara item por item na revisão.</p></div>` : ''}
+    <details class="more" open><summary>Dados que vão no laudo</summary>
+      <div class="stack">
+        <p class="hint">Os nomes do locador, do locatário e do vistoriador vão nas assinaturas. Pode preencher agora ou depois; o revisor lembra antes do PDF.</p>
+        <div class="grid2">
+          <div class="field"><label for="f-locador">Locador (proprietário)</label><input id="f-locador" data-bind="locador" value="${esc(v.locador)}" autocomplete="off"></div>
+          <div class="field"><label for="f-locatario">Locatário (inquilino)</label><input id="f-locatario" data-bind="locatario" value="${esc(v.locatario)}" autocomplete="off"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="f-cod">Código do imóvel</label><input id="f-cod" data-bind="codigo" value="${esc(v.codigo)}" autocomplete="off"></div>
+          <div class="field"><label for="f-vist">Vistoriador</label><input id="f-vist" data-bind="vistoriador" value="${esc(v.vistoriador)}" autocomplete="off"></div>
+        </div>
+      </div>
+    </details>
+    <div id="msg-dados">${viewMsg('dados')}</div>
+    ${v._novo ? `<button class="btn primary block" data-act="criar">Criar a pasta no Drive e começar</button>` : `<p class="hint">${travado ? 'O laudo desta vistoria já foi gerado. Se mudar algo aqui, gere o PDF de novo na fase Laudo.' : 'As alterações são salvas sozinhas.'}</p>`}
+  </section>
+  ${!v._novo ? `<section class="card flat">
+    <h3>${v.arquivada ? 'Vistoria arquivada' : 'Arquivar esta vistoria'}</h3>
+    <p class="hint">${v.arquivada ? 'Ela não aparece na lista principal, só na aba Arquivadas.' : 'Tira a vistoria da lista principal e guarda na aba Arquivadas. Nada é apagado.'}</p>
+    <div><button class="btn sm" data-act="arquivar">${v.arquivada ? 'Desarquivar' : 'Arquivar vistoria'}</button></div>
+    ${S.souDono ? `<h3>Excluir de vez</h3>
+    <p class="hint">Só você, dono do app, vê esta opção. Apaga a vistoria e as fotos guardadas no app, sem volta. A pasta e os arquivos no Google Drive continuam lá.</p>
+    <div><button class="btn danger sm" data-act="excluir">${S.confirmar === 'vist' ? 'Toque de novo para excluir de vez' : 'Excluir de vez'}</button></div>` : ''}
+  </section>` : ''}`;
+}
+function viewDriveLinha(v) {
+  if (S.criandoPasta) return `<div class="loading-line"><span class="spin"></span>Criando a pasta "${esc(tituloPasta(v))}" no Google Drive</div>`;
+  const err = S.avisos['drive-' + v.id];
+  if (v.drive && v.drive.pasta) {
+    return `<div class="msg ok"><p>Pasta no Google Drive: <a href="${esc(v.drive.pastaUrl || urlPasta(v.drive.pasta))}" target="_blank" rel="noopener">${esc(v.drive.nome || tituloPasta(v))}</a>, com a subpasta Imagens.</p>${err ? `<p>${esc(err)}</p>` : ''}</div>`;
+  }
+  if (err) return `<div class="msg bad"><p>Não consegui criar a pasta no Drive. ${esc(err)} A vistoria segue guardada aqui; as fotos vão para o Drive assim que isso for resolvido.</p><div class="row"><button class="btn sm" data-act="drive">Tentar de novo</button></div></div>`;
+  if (!S.mcp) return aviso('O Google Drive não está disponível nesta tela. A vistoria fica guardada aqui e você baixa o PDF no final.');
+  return '';
+}
+function viewFotosLote() {
+  const v = S.v;
+  const n = v.loteAtual.n;
+  const fotos = v.fotos.filter((f) => f.lote === n && f.pendente);
+  return fotos.map((f) => {
+    const u = fotoUrl(f.asset);
+    return `<figure class="th">${u ? `<img src="${esc(u)}" alt="Foto ${esc(f.code)}" loading="lazy">` : ''}<figcaption>${esc(f.code)}</figcaption><button class="x" data-act="rmfoto" data-asset="${esc(f.asset)}" aria-label="Remover a foto ${esc(f.code)}">${IC.x}</button></figure>`;
+  }).join('') + S.carregando.map((t) => `<figure class="th loading"><img src="${esc(t.url)}" alt="" style="opacity:.35;position:absolute;inset:0"><span class="spin"></span></figure>`).join('');
+}
+function desenharFotos() {
+  const v = S.v;
+  if (!v || S.tela !== 'vistoria' || S.aba !== 'lotes') return;
+  const th = document.getElementById('thumbs');
+  if (th) th.innerHTML = viewFotosLote();
+  const n = v.fotos.filter((f) => f.lote === v.loteAtual.n && f.pendente).length + S.subindo;
+  const ct = document.getElementById('count');
+  if (ct) ct.textContent = `${n} de ${MAX_FOTOS} fotos`;
+}
+function viewResultado() {
+  const u = S.ultimo;
+  if (!u || u.vid !== S.v.id) return '';
+  const d = u.drive;
+  const driveTxt = !u.lote.fotos.length ? '' : d && d.erro && d.ok < d.total ? `<div class="msg warn"><p>Drive: ${d.ok} de ${d.total} fotos enviadas. ${esc(erroDrive(d.erro))} As que faltaram vão no fim, junto com o laudo.</p></div>` : `<p class="hint">Drive: ${plural(d ? d.ok : 0, 'foto enviada', 'fotos enviadas')} para a pasta Imagens.</p>`;
+  return `<section class="card">
+    <p class="kicker"><span class="rule"></span>Lote ${u.lote.n} processado</p>
+    <h2>Lote processado com sucesso.</h2>
+    ${u.lote.resumo ? `<p class="lede">${esc(u.lote.resumo)}</p>` : ''}
+    ${u.mudancas.length ? `<ul class="changes">${u.mudancas.map((m) => `<li class="est-${esc(m.estado)}"><span class="sq est-${esc(m.estado)}"></span><span class="nm"><b>${esc(m.comodo)}</b> · ${esc(m.item)}${m.novo ? '' : ' <span class="muted">(atualizado)</span>'}</span><span class="estado-txt">${esc(estadoLabel(m.estado))}</span></li>`).join('')}</ul>` : '<p class="muted">Nenhum item novo neste lote.</p>'}
+    ${u.lote.duvidas.length ? `<div class="stack"><p class="label">O Claude ficou com dúvida em</p><ul class="bullets">${u.lote.duvidas.map((q) => `<li>${esc(q)}</li>`).join('')}</ul><p class="hint">Responda falando no próximo lote, com ou sem fotos.</p></div>` : ''}
+    ${driveTxt}
+    ${u.copia && u.copia.ok ? '<p class="hint">Cópia de segurança dos dados salva na subpasta Dados da vistoria.</p>' : u.copia ? `<div class="msg warn"><p>A cópia de segurança não foi para o Drive: ${esc(erroDrive(u.copia.erro))} Os dados continuam guardados no app, e o app tenta de novo no próximo lote.</p></div>` : ''}
+    <p class="ask">Deseja enviar o próximo lote ou podemos encerrar e consolidar a vistoria?</p>
+    <div class="row2"><button class="btn primary" data-act="proximo">Enviar o próximo lote</button><button class="btn" data-act="consolidar">Encerrar e consolidar</button></div>
+  </section>`;
+}
+function viewRelatorioCurto(v) {
+  if (!v.comodos.length) return '';
+  return `<section class="card flat">
+    <p class="kicker quiet"><span class="rule"></span>Relatório até agora</p>
+    <ul class="changes">${v.comodos.map((c) => {
+      const crit = c.itens.filter((i) => i.critico || i.estado === 'ruim').length;
+      return `<li><span class="sq ${crit ? 'est-ruim' : 'est-bom'}"></span><span class="nm"><b>${esc(c.nome)}</b> · ${plural(c.itens.length, 'item', 'itens')}</span><span class="muted">${crit ? plural(crit, 'ponto de atenção', 'pontos de atenção') : ''}</span></li>`;
+    }).join('')}</ul>
+    ${v.lotes.length ? `<details class="more"><summary>Lotes enviados (${v.lotes.length})</summary><div class="stack">${v.lotes.map((l) => `<div class="stack"><p><b>Lote ${l.n}</b> <span class="muted">· ${plural(l.fotos.length, 'foto', 'fotos')}</span></p>${l.resumo ? `<p class="hint">${esc(l.resumo)}</p>` : ''}<p class="hint">Fala: ${esc(l.texto.slice(0, 400))}${l.texto.length > 400 ? '...' : ''}</p></div>`).join('')}</div></details>` : ''}
+  </section>`;
+}
+function viewLotes() {
+  const v = S.v;
+  const n = v.loteAtual.n;
+  const resultado = viewResultado();
+  const mostrarForm = !(resultado && S.pedirProximo);
+  const nPend = v.fotos.filter((f) => f.lote === n && f.pendente).length;
+  const semClaude = !S.sample ? aviso('O Claude não está disponível nesta tela. O lote vai ser guardado sem organização automática e você organiza os itens na revisão.') : '';
+  const primeira = !v.lotes.length && v.drive && v.drive.pasta && !S.criandoPasta ? `<p class="lede">Estrutura criada. Pode enviar o primeiro lote.</p>` : '';
+  return `${viewDriveLinha(v)}
+    ${resultado}
+    ${mostrarForm ? `<section class="card">
+      <p class="kicker"><span class="rule"></span>Fase 2 · Lote ${n}</p>
+      <h2>${v.lotes.length ? `Lote ${n}` : 'Envie o lote 1'}</h2>
+      ${primeira}
+      ${semClaude}
+      ${S.podeEscrever !== false && !S.assets ? aviso('Sem permissão para guardar fotos neste app: elas ficam só nesta tela até o laudo ser gerado. Peça acesso de edição para guardar.') : ''}
+      <div class="photo-actions">
+        <label class="btn">${IC.cam}Tirar foto<input class="vh" type="file" accept="image/*" capture="environment" data-pick></label>
+        <label class="btn">${IC.img}Escolher fotos<input class="vh" type="file" accept="image/*" multiple data-pick></label>
+        <span class="count" id="count">${nPend + S.subindo} de ${MAX_FOTOS} fotos</span>
+      </div>
+      <div class="thumbs" id="thumbs">${viewFotosLote()}</div>
+      <div class="field"><label for="f-fala">O que você viu neste lote</label>
+        <textarea id="f-fala" data-bind="loteAtual.texto" rows="6" placeholder="Ex.: Cozinha. Piso de cerâmica bege em bom estado, uma peça trincada perto da pia. Torneira pingando. Armário de cima com a porta desalinhada.">${esc(v.loteAtual.texto)}</textarea>
+        <p class="hint">Toque no microfone do teclado do celular e fale como se mandasse um áudio: cômodo, item e estado. O celular escreve o que você disse.</p></div>
+      <div id="msg-lote">${viewMsg('lote')}</div>
+      <div class="row2">
+        <button class="btn primary" data-act="processar">Processar o lote ${n}</button>
+        ${v.lotes.length ? '<button class="btn" data-act="consolidar">Encerrar e consolidar</button>' : ''}
+      </div>
+    </section>` : ''}
+    ${viewRelatorioCurto(v)}`;
+}
+function miniFotos(v, codes) {
+  if (!codes.length) return '';
+  const mostra = codes.slice(0, 6);
+  return `<span class="mini">${mostra.map((code) => {
+    const f = fotoPorCodigo(v, code);
+    const u = f ? fotoUrl(f.asset) : '';
+    return u ? `<img src="${esc(u)}" alt="Foto ${esc(code)}" title="${esc(code)}" loading="lazy">` : `<span class="ph" title="${esc(code)}"></span>`;
+  }).join('')}${codes.length > 6 ? `<span class="more-n">+${codes.length - 6}</span>` : ''}</span>`;
+}
+function viewItem(c, i) {
+  const k = 'i' + i.id;
+  return `<div class="item est-${esc(i.estado)}">
+    <div class="item-top">
+      <input data-c="${esc(c.id)}" data-i="${esc(i.id)}" data-f="nome" value="${esc(i.nome)}" aria-label="Nome do item">
+      <select data-c="${esc(c.id)}" data-i="${esc(i.id)}" data-f="estado" aria-label="Estado de ${esc(i.nome)}">
+        <option value="" ${!i.estado ? 'selected' : ''}>Sem estado</option>
+        ${ESTADOS.map(([val, lab]) => `<option value="${val}" ${i.estado === val ? 'selected' : ''}>${lab}</option>`).join('')}
+      </select>
+    </div>
+    <textarea data-c="${esc(c.id)}" data-i="${esc(i.id)}" data-f="descricao" rows="3" aria-label="Descrição de ${esc(i.nome)}">${esc(i.descricao)}</textarea>
+    <div class="item-foot">
+      <label class="chk"><input type="checkbox" data-c="${esc(c.id)}" data-i="${esc(i.id)}" data-f="critico" ${i.critico ? 'checked' : ''}>Ponto de atenção</label>
+      ${miniFotos(S.v, i.fotos)}
+      <button class="btn ghost sm" data-act="rmitem" data-c="${esc(c.id)}" data-i="${esc(i.id)}">${S.confirmar === k ? 'Confirmar exclusão' : 'Excluir item'}</button>
+    </div>
+  </div>`;
+}
+function viewComodo(c) {
+  const k = 'c' + c.id;
+  return `<section class="card" id="c-${esc(c.id)}">
+    <div class="comodo-head">
+      <input data-c="${esc(c.id)}" data-f="nome" value="${esc(c.nome)}" aria-label="Nome do cômodo">
+      <button class="btn ghost sm" data-act="rmcomodo" data-c="${esc(c.id)}">${S.confirmar === k ? 'Confirmar exclusão' : 'Excluir cômodo'}</button>
+    </div>
+    <div class="itens">${c.itens.map((i) => viewItem(c, i)).join('') || '<p class="muted" style="padding:12px 0">Nenhum item neste cômodo.</p>'}</div>
+    <div><button class="btn sm" data-act="additem" data-c="${esc(c.id)}">Adicionar item</button></div>
+    <div class="field"><label for="obs-${esc(c.id)}">Observações do cômodo</label><textarea id="obs-${esc(c.id)}" data-c="${esc(c.id)}" data-f="observacoes" rows="2">${esc(c.observacoes || '')}</textarea></div>
+  </section>`;
+}
+function viewComparacao(v) {
+  if (v.tipo !== 'saida') return '';
+  const e = entradaDe(v);
+  if (!e) return `<section class="card"><p class="kicker"><span class="rule"></span>Comparação com a entrada</p><p class="muted">Esta vistoria de saída não está ligada a uma vistoria de entrada no app, então o laudo sai sem o comparativo. Para ligar, escolha a entrada na fase Dados.</p></section>`;
+  const cmp = v.comparacao;
+  const av = S.avisos['comp-' + v.id];
+  let corpo = '';
+  if (!cmp) corpo = `<p class="muted">Ainda não comparado.</p>`;
+  else {
+    const mud = cmp.itens.filter((x) => x.situacao !== 'sem_alteracao');
+    const iguais = cmp.itens.filter((x) => x.situacao === 'sem_alteracao');
+    corpo = `${cmp.resumo ? `<p class="lede">${esc(cmp.resumo)}</p>` : ''}
+      ${cmp.desatualizada ? aviso('O relatório mudou depois desta comparação. Compare de novo antes de gerar o laudo.') : ''}
+      <div class="cmp">${mud.map((x) => `<div class="cmp-row sit-${esc(x.situacao)}">
+        <div class="top-l"><b>${esc(x.comodo)} · ${esc(x.item)}</b><span class="de-para">Entrada: ${esc(x.entrada ? estadoLabel(x.entrada) : 'não registrado')} · Saída: ${esc(x.saida ? estadoLabel(x.saida) : 'não registrado')}</span></div>
+        <select data-cmp="${esc(x.id)}" data-f="situacao" aria-label="Situação de ${esc(x.item)}">${SITUACOES.map(([val, lab]) => `<option value="${val}" ${x.situacao === val ? 'selected' : ''}>${lab}</option>`).join('')}</select>
+        <textarea data-cmp="${esc(x.id)}" data-f="explicacao" rows="2" aria-label="Explicação">${esc(x.explicacao)}</textarea>
+        ${x.sugestao ? `<p class="sug">Sugestão do Claude: ${esc(x.sugestao)}</p>` : ''}
+      </div>`).join('') || '<p class="muted" style="padding:12px 0">Nenhuma diferença encontrada.</p>'}</div>
+      ${iguais.length ? `<details class="more"><summary>Sem alteração (${iguais.length})</summary><p class="hint" style="margin-top:10px">${iguais.map((x) => esc(`${x.comodo}, ${x.item}`)).join('; ')}.</p></details>` : ''}`;
+  }
+  return `<section class="card">
+    <p class="kicker"><span class="rule"></span>Comparação com a entrada de ${esc(dataCurta(e.data))}</p>
+    <h2>O que mudou desde a entrada</h2>
+    ${av ? aviso(av, 'bad') : ''}
+    ${corpo}
+    ${S.sample ? `<div><button class="btn sm" data-act="refazer" data-val="comp">${cmp ? 'Comparar de novo' : 'Comparar com a entrada'}</button></div>` : ''}
+  </section>`;
+}
+function viewRevisao() {
+  const v = S.v;
+  const nItens = v.comodos.reduce((a, c) => a + c.itens.length, 0);
+  const criticos = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => { if (i.critico || i.estado === 'ruim') criticos.push({ c, i }); }));
+  const semEstado = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => { if (!i.estado) semEstado.push(`${c.nome}, ${i.nome}`); }));
+  const avP = S.avisos['parecer-' + v.id];
+  return `<section class="card">
+      <p class="kicker"><span class="rule"></span>Fase 3 · Revisão</p>
+      <h2>Resumo da vistoria</h2>
+      <div class="summary-line"><span><b>${v.comodos.length}</b>${v.comodos.length === 1 ? 'cômodo' : 'cômodos'}</span><span><b>${nItens}</b>${nItens === 1 ? 'item' : 'itens'}</span><span><b>${v.fotos.length}</b>${v.fotos.length === 1 ? 'foto' : 'fotos'}</span><span><b>${criticos.length}</b>${criticos.length === 1 ? 'ponto de atenção' : 'pontos de atenção'}</span></div>
+      ${criticos.length ? `<div class="stack"><p class="label">Itens críticos identificados</p><ul class="changes">${criticos.map(({ c, i }) => `<li><span class="sq est-${esc(i.estado || 'ruim')}"></span><span class="nm"><b>${esc(c.nome)}</b> · ${esc(i.nome)}</span><span class="estado-txt est-${esc(i.estado)}">${esc(estadoLabel(i.estado))}</span></li>`).join('')}</ul></div>` : '<p class="muted">Nenhum item crítico identificado.</p>'}
+      ${semEstado.length ? aviso(`Sem estado definido: ${semEstado.slice(0, 8).join('; ')}${semEstado.length > 8 ? '...' : ''}.`) : ''}
+      <p class="hint">Por favor, revise os dados abaixo. Tudo é editável e salvo sozinho. Quando estiver certo, aprove no fim da página.</p>
+    </section>
+    ${viewComparacao(v)}
+    ${v.comodos.map(viewComodo).join('')}
+    <div><button class="btn" data-act="addcomodo">Adicionar cômodo</button></div>
+    ${(v.fotosSoltas || []).length ? `<section class="card"><p class="kicker quiet"><span class="rule"></span>Fotos sem item definido</p><p class="hint">Estas fotos entram no laudo na seção Outras fotos. Para ligar uma foto a um item, use a correção falada, por exemplo: "a foto L02-F04 é do box do banheiro".</p>${miniFotos(v, v.fotosSoltas)}<p class="hint">${esc(v.fotosSoltas.join(', '))}</p></section>` : ''}
+    <section class="card">
+      <div class="field"><label for="f-obs">Observações gerais</label><textarea id="f-obs" data-bind="observacoesGerais" rows="3" placeholder="Ex.: imóvel entregue limpo, com 3 cópias de chave.">${esc(v.observacoesGerais || '')}</textarea></div>
+      <div class="field"><label for="f-parecer">Considerações finais do laudo</label>
+        ${avP ? aviso(avP, 'bad') : ''}
+        ${v.parecerDesatualizado ? aviso('O relatório mudou depois que este texto foi escrito. Confira ou peça para reescrever.') : ''}
+        <textarea id="f-parecer" data-bind="parecer" rows="5">${esc(v.parecer || '')}</textarea></div>
+      ${S.sample ? `<div><button class="btn sm" data-act="refazer" data-val="parecer">${v.parecer ? 'Reescrever com o Claude' : 'Escrever com o Claude'}</button></div>` : ''}
+    </section>
+    ${S.sample ? `<section class="card">
+      <p class="kicker quiet"><span class="rule"></span>Corrigir falando</p>
+      <div class="field"><label for="f-corr">Diga o que precisa mudar</label>
+        <textarea id="f-corr" data-corr rows="3" placeholder="Ex.: no quarto 2 a janela não está quebrada, só está com o trinco duro. Junte os dois banheiros num só.">${esc(S.correcao)}</textarea>
+        <p class="hint">Use o microfone do teclado. O Claude aplica só o que você pedir.</p></div>
+      <div id="msg-corr">${viewMsg('corr')}</div>
+      <div><button class="btn" data-act="corrigir">Aplicar a correção</button></div>
+    </section>` : ''}
+    ${S.revisao && S.revisao.vid === v.id ? viewPainelRevisao() : `<section class="card">
+      <p class="ask">Por favor, revise os dados acima. Deseja corrigir ou complementar alguma informação antes de gerarmos o PDF final?</p>
+      <p class="hint">Antes do PDF, o revisor confere a padronização do laudo e mostra o que achou.</p>
+      <div id="msg-aprovar">${viewMsg('aprovar')}</div>
+      <div class="row2"><button class="btn" data-act="complementar">Complementar com outro lote</button><button class="btn primary" data-act="aprovar">Aprovar e gerar o PDF</button></div>
+    </section>`}`;
+}
+function viewLaudo() {
+  const v = S.v;
+  if (S.laudoErro) return `<section class="card"><p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p>${aviso(S.laudoErro, 'bad')}<div class="row2"><button class="btn primary" data-act="gerar-direto">Tentar de novo</button><button class="btn" data-act="aba" data-val="revisao">Voltar para a revisão</button></div></section>`;
+  if (v.status !== 'concluida') return `<section class="card"><p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p><p class="muted">O laudo ainda não foi gerado.</p><div><button class="btn primary" data-act="aprovar">Gerar o PDF</button></div></section>`;
+  const tipo = v.tipo === 'saida' ? 'saída' : 'entrada';
+  const pastaUrl = v.drive && (v.drive.pastaUrl || (v.drive.pasta && urlPasta(v.drive.pasta)));
+  return `<section class="card">
+    <p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p>
+    <div class="done-mark"><span class="ic-ok">${IC.check}</span><h2>Vistoria concluída.</h2></div>
+    <p class="lede">O laudo de vistoria de ${tipo} do imóvel situado em ${esc(v.endereco)}, realizada em ${esc(dataLonga(v.data))}, foi gerado${v.drive && v.drive.pdf ? ` e arquivado na pasta desta vistoria no Google Drive, junto com ${plural(v.fotos.length, 'foto original', 'fotos originais')}` : ''}.</p>
+    <p class="lede">Imprima o laudo para a assinatura do locador e do locatário, ou envie o PDF para assinatura digital. Agradecemos o trabalho em campo.</p>
+    ${S.laudoAviso ? aviso(S.laudoAviso) : ''}
+    <div class="links">
+      ${pastaUrl ? `<a class="btn primary block" href="${esc(pastaUrl)}" target="_blank" rel="noopener">Abrir a pasta no Google Drive</a>` : ''}
+      ${v.drive && v.drive.pdfUrl ? `<a class="btn block" href="${esc(v.drive.pdfUrl)}" target="_blank" rel="noopener">Abrir o PDF no Drive</a>` : ''}
+      ${S.downloads ? '<button class="btn block" data-act="baixar">Baixar o PDF</button>' : ''}
+    </div>
+    ${pastaUrl ? `<p class="hint">Link da pasta: <span style="user-select:all;overflow-wrap:anywhere">${esc(pastaUrl)}</span></p>` : ''}
+  </section>
+  <section class="card flat">
+    <h3>Precisa mudar algo?</h3>
+    <p class="hint">Volte para a revisão, ajuste e gere o PDF de novo. A nova versão é salva na mesma pasta, sem apagar a anterior.</p>
+    <div class="row2"><button class="btn" data-act="reabrir">Voltar para a revisão</button><button class="btn" data-act="aprovar">Gerar o PDF de novo</button></div>
+  </section>`;
+}
+function viewVistoria() {
+  const v = S.v;
+  const busy = S.busy && S.busy.vid === v.id;
+  let corpo;
+  if (busy) corpo = viewBusy();
+  else if (S.aba === 'dados') corpo = viewDados();
+  else if (S.aba === 'lotes') corpo = viewLotes();
+  else if (S.aba === 'revisao') corpo = viewRevisao();
+  else corpo = viewLaudo();
+  return `<main class="shell">
+    ${avisoAmbiente()}
+    <div class="stack" style="gap:4px">
+      <p class="kicker quiet"><span class="rule"></span>Vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'}${v.data ? ' · ' + esc(dataCurta(v.data)) : ''}</p>
+      <h1 style="font-size:clamp(1.4rem,5vw,1.9rem)">${esc(v.endereco || 'Nova vistoria')}</h1>
+    </div>
+    ${viewPassos()}
+    ${corpo}
+  </main>`;
+}
+function viewConfig() {
+  const c = S.cfg;
+  const dono = S.souDono;
+  const pastaUrl = c.driveRaizId ? (c.driveRaizUrl || urlPasta(c.driveRaizId)) : '';
+  return `<main class="shell">
+    ${avisoAmbiente()}
+    <section class="hero"><p class="kicker"><span class="rule"></span>Configurações</p><h1>Dados, pasta e <em>acessos</em></h1></section>
+    <section class="card" id="conexoes">
+      <h3>Verificar conexões</h3>
+      <p class="hint">Confere, em menos de um minuto, se o banco de vistorias, as fotos, o Claude e o Google Drive estão funcionando nesta conta.</p>
+      <div><button class="btn sm" data-act="verificar" ${S.verificando ? 'disabled' : ''}>${S.verif ? 'Verificar de novo' : 'Verificar agora'}</button></div>
+      ${viewVerif()}
+    </section>
+    <section class="card" id="onde">
+      <h2>Onde ficam os dados</h2>
+      <ul class="lista-def">
+        <li><b>Texto das vistorias</b><span>Endereço, nomes, descrições, falas e comparações ficam num banco de dados que vem junto com este app, nos servidores do Claude, na conta do dono do app. Ele não aparece como pasta. Todo mundo que tem acesso ao app vê todas as vistorias.</span></li>
+        <li><b>Fotos</b><span>Guardadas no app e copiadas para a subpasta Imagens de cada vistoria, na pasta da imobiliária no Google Drive.</span></li>
+        <li><b>Laudos em PDF</b><span>Na pasta de cada vistoria, no Google Drive.</span></li>
+        <li><b>Cópia de segurança</b><span>A cada lote e a cada laudo, os dados completos da vistoria vão para a subpasta Dados, no Google Drive.</span></li>
+        <li><b>Neste aparelho</b><span>Só um rascunho temporário, para não perder o que foi digitado se a internet cair. Ele some quando a vistoria é salva.</span></li>
+        <li><b>Se o app for apagado</b><span>O banco e as fotos guardadas no app somem. O que está no Google Drive continua lá.</span></li>
+      </ul>
+      ${dono && S.downloads ? '<div><button class="btn sm" data-act="planilha">Baixar todas as vistorias em planilha</button></div>' : ''}
+    </section>
+    <section class="card">
+      <h3>Pasta da imobiliária no Google Drive</h3>
+      ${pastaUrl
+        ? `<p class="hint">Todas as vistorias, de todos da equipe, vão para a pasta "${esc(nomeRaiz())}". Você pode mover essa pasta para onde quiser no Drive; o app continua achando.</p><div><a class="btn sm" href="${esc(pastaUrl)}" target="_blank" rel="noopener">Abrir a pasta das vistorias</a></div>`
+        : `<p class="muted">${dono ? 'A pasta ainda não existe. Crie agora para poder compartilhar com a equipe.' : 'O dono do app ainda não criou a pasta das vistorias.'}</p>`}
+      ${dono ? `<div><button class="btn primary sm" data-act="cfg-pasta" ${S.cfgOcupado ? 'disabled' : ''}>${pastaUrl ? 'Conferir se a pasta está acessível' : 'Criar a pasta agora'}</button></div>
+        <div class="field"><label for="c-pasta">Usar outra pasta do Drive (cole o link da pasta)</label><input id="c-pasta" data-novapasta value="${esc(S.novaPasta)}" placeholder="https://drive.google.com/drive/folders/..." autocomplete="off"></div>
+        <div><button class="btn sm" data-act="cfg-trocar" ${S.cfgOcupado ? 'disabled' : ''}>Usar esta pasta</button></div>` : '<p class="hint">Só o dono do app cria ou troca a pasta.</p>'}
+      ${S.cfgOcupado ? '<div class="loading-line"><span class="spin"></span>Falando com o Google Drive</div>' : ''}
+      ${S.cfgAviso ? aviso(S.cfgAviso, 'bad') : ''}
+    </section>
+    <section class="card">
+      <h3>Como dar acesso a um colega</h3>
+      <ol class="phases">
+        <li><b>Compartilhe a pasta no Drive</b><span>No Google Drive, compartilhe a pasta "${esc(nomeRaiz())}" com o e-mail do colega, como Editor.</span></li>
+        <li><b>Compartilhe o app no Claude</b><span>No menu Compartilhar deste app, convide o mesmo e-mail com acesso de Editor. Não ligue o link público: com ele, ninguém consegue salvar.</span></li>
+        <li><b>Conta do colega</b><span>Ele precisa de uma conta no Claude com o Google Drive conectado (Configurações, Conectores).</span></li>
+        <li><b>Teste com um lote</b><span>Peça para ele criar uma vistoria de teste e processar um lote com uma foto.</span></li>
+      </ol>
+      ${aviso('Em plano individual do Claude (Pro ou Max), a ajuda oficial diz que convidados não conseguem usar as partes do app que chamam o Claude e o Google Drive. Se o teste falhar nesse ponto, a saída é o plano Team, que coloca a equipe na mesma organização.')}
+    </section>
+    ${viewIdentidade()}
+    <section class="card">
+      <h3>Dados que aparecem no laudo</h3>
+      ${dono ? '' : '<p class="hint">Só o dono do app muda estes dados.</p>'}
+      <fieldset class="fs" ${dono ? '' : 'disabled'}>
+      <div class="grid2">
+        <div class="field"><label for="c-emp">Nome da imobiliária</label><input id="c-emp" data-cfg="empresa" value="${esc(c.empresa)}"></div>
+        <div class="field"><label for="c-creci">CRECI</label><input id="c-creci" data-cfg="creci" value="${esc(c.creci)}"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="c-cid">Cidade (vai na data do laudo)</label><input id="c-cid" data-cfg="cidade" value="${esc(c.cidade)}"></div>
+        <div class="field"><label for="c-cont">Contato no rodapé (opcional)</label><input id="c-cont" data-cfg="contato" value="${esc(c.contato)}" placeholder="Telefone ou site"></div>
+      </div>
+      <div class="field"><label for="c-de">Declaração do laudo de entrada</label><textarea id="c-de" data-cfg="declaracaoEntrada" rows="5">${esc(c.declaracaoEntrada)}</textarea></div>
+      <div class="field"><label for="c-ds">Declaração do laudo de saída</label><textarea id="c-ds" data-cfg="declaracaoSaida" rows="4">${esc(c.declaracaoSaida)}</textarea></div>
+      </fieldset>
+      <p class="hint">Vale a pena o advogado da imobiliária conferir estes dois textos. As mudanças são salvas sozinhas.</p>
+    </section>
+    ${S.permissions ? `<section class="card"><h3>Permissões</h3><p class="hint">Na primeira vez, o app pede licença para usar o Claude e o Google Drive. Aqui você revê o que liberou.</p><div><button class="btn" data-act="permissoes">Revisar permissões</button></div></section>` : ''}
+  </main>`;
+}
+function render() {
+  let corpo;
+  if (S.tela === 'vistoria' && S.v) corpo = viewVistoria();
+  else if (S.tela === 'config') corpo = viewConfig();
+  else if (S.tela === 'inicio') corpo = viewInicio();
+  else corpo = viewHome();
+  app.innerHTML = viewTopo() + corpo;
+  if (S.tela === 'home') resolverNomes();
+}
+/* Os nomes de quem fez cada vistoria vêm da conta de cada pessoa, na hora de mostrar; no banco fica só o código da pessoa. */
+async function resolverNomes() {
+  if (!S.user || typeof S.user.profiles !== 'function') return;
+  const ids = [...new Set(S.lista.map((v) => v.criadoPor).filter(Boolean))];
+  if (!ids.length) return;
+  let ps;
+  try { ps = await S.user.profiles(ids); } catch (_) { return; }
+  for (const id of ids) { const p = ps && ps[id]; S.nomes[id] = p ? (p.isMe ? 'você' : (p.name || 'outra pessoa')) : 'outra pessoa'; }
+  document.querySelectorAll('[data-autor]').forEach((el) => { el.textContent = S.nomes[el.dataset.autor] || 'outra pessoa'; });
+}
+
+/* ---------- navegação ---------- */
+async function irPara(tela) {
+  if (S.busy) { toast('Espere terminar o que está em andamento.'); return; }
+  if (S.tela === 'vistoria' && S.v && !S.v._novo) await flush();
+  S.tela = tela; S.confirmar = null; S.msg = null;
+  if (tela !== 'vistoria') { S.v = null; S.ultimo = null; setSave('idle'); }
+  render();
+  window.scrollTo(0, 0);
+}
+function abrir(id) {
+  const doc = S.lista.find((x) => x.id === id);
+  if (!doc) return;
+  let v = clone(doc);
+  let recuperado = false;
+  try {
+    const bruto = localStorage.getItem('ve-rascunho-' + id);
+    if (bruto) {
+      const r = JSON.parse(bruto);
+      if (r && r.id === id && (r.atualizadoEm || 0) > (doc.atualizadoEm || 0)) { v = r; recuperado = true; }
+      else localStorage.removeItem('ve-rascunho-' + id);
+    }
+  } catch (_) {}
+  v.comodos = v.comodos || []; v.fotos = v.fotos || []; v.lotes = v.lotes || []; v.fotosSoltas = v.fotosSoltas || [];
+  v.loteAtual = v.loteAtual || { n: v.lotes.length + 1, texto: '' }; v.drive = v.drive || {};
+  v.comodos.forEach((c) => { c.itens = c.itens || []; c.itens.forEach((i) => { i.fotos = i.fotos || []; }); });
+  S.v = v; S.tela = 'vistoria'; S.aba = v.fase === 'dados' ? 'lotes' : v.fase;
+  S.ultimo = null; S.pedirProximo = false; S.msg = null; S.confirmar = null; S.laudoErro = ''; S.laudoAviso = '';
+  setSave('saved');
+  render();
+  window.scrollTo(0, 0);
+  if (recuperado) { markDirty(); toast('Recuperei alterações desta vistoria que não tinham sido salvas neste aparelho.'); }
+}
+function acharComodo(id) { return S.v && S.v.comodos.find((c) => c.id === id); }
+
+/* ---------- eventos ---------- */
+app.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.act, v = S.v;
+  if (act !== 'excluir' && act !== 'rmitem' && act !== 'rmcomodo') S.confirmar = null;
+  switch (act) {
+    case 'home': return irPara('home');
+    case 'config': return irPara('config');
+    case 'onde': await irPara('config'); { const el = document.getElementById('onde'); if (el) el.scrollIntoView({ block: 'start' }); } return;
+    case 'cfg-pasta': return prepararPastaRaiz();
+    case 'cfg-trocar': return trocarPastaRaiz();
+    case 'planilha': return baixarPlanilha();
+    case 'filtro': S.filtro = b.dataset.val; return render();
+    case 'nova': S.v = novaVistoria(); S.tela = 'vistoria'; S.aba = 'dados'; S.msg = null; setSave('idle'); render(); window.scrollTo(0, 0); { const f = document.getElementById('f-end'); if (f) f.focus(); } return;
+    case 'abrir': return abrir(b.dataset.id);
+    case 'tipo': if (v && v._novo) { v.tipo = b.dataset.val; if (v.tipo === 'entrada') v.entradaId = ''; render(); } return;
+    case 'criar': return criar();
+    case 'drive': return tentarDrive();
+    case 'aba': if (v && !S.busy) { S.aba = b.dataset.val; S.msg = null; S.laudoErro = S.aba === 'laudo' ? S.laudoErro : ''; render(); window.scrollTo(0, 0); } return;
+    case 'rmfoto': return removerFoto(b.dataset.asset);
+    case 'processar': return processarLote();
+    case 'parar': if (S.busy && S.busy.ctl) S.busy.ctl.abort(); return;
+    case 'proximo': S.pedirProximo = false; S.ultimo = null; render(); { const el = document.getElementById('lote-topo') || document.querySelector('[data-pick]'); if (el) el.closest('.card').scrollIntoView({ block: 'start' }); } return;
+    case 'consolidar': return consolidar();
+    case 'complementar': if (v) { v.fase = 'lotes'; S.aba = 'lotes'; S.ultimo = null; S.pedirProximo = false; markDirty(); render(); window.scrollTo(0, 0); } return;
+    case 'aprovar': return revisarLaudo();
+    case 'gerar-direto': return finalizar();
+    case 'rev-aplicar': return aplicarRevisao(true);
+    case 'rev-sem': return aplicarRevisao(false);
+    case 'rev-voltar': S.revisao = null; render(); window.scrollTo(0, 0); return;
+    case 'verificar': return verificarConexoes();
+    case 'concluir-inicio': return concluirInicio();
+    case 'comecar': S.tela = 'home'; S.verif = null; render(); window.scrollTo(0, 0); return;
+    case 'combo': return aplicarCombo(+b.dataset.i);
+    case 'tirar-logo': return tirarLogo();
+    case 'reabrir': if (v) { v.fase = 'revisao'; v.status = 'andamento'; S.aba = 'revisao'; S.laudoAviso = ''; markDirty(); render(); window.scrollTo(0, 0); } return;
+    case 'baixar': return baixarPDF();
+    case 'refazer': return refazer(b.dataset.val);
+    case 'corrigir': return corrigir();
+    case 'desfazer': return desfazerCorrecao();
+    case 'addcomodo': if (v) { const c = { id: uid(), nome: 'Novo cômodo', itens: [], observacoes: '' }; v.comodos.push(c); markDirty(); render(); const el = document.querySelector(`#c-${CSS.escape(c.id)} input`); if (el) { el.focus(); el.select(); } } return;
+    case 'additem': { const c = acharComodo(b.dataset.c); if (!c) return; const it = { id: uid(), nome: 'Novo item', estado: '', descricao: '', fotos: [], critico: false }; c.itens.push(it); markDirty(); render(); const el = document.querySelector(`[data-i="${CSS.escape(it.id)}"][data-f="nome"]`); if (el) { el.focus(); el.select(); } return; }
+    case 'rmitem': {
+      const k = 'i' + b.dataset.i;
+      if (S.confirmar !== k) { S.confirmar = k; b.textContent = 'Confirmar exclusão'; return; }
+      const c = acharComodo(b.dataset.c); if (!c) return;
+      const it = c.itens.find((x) => x.id === b.dataset.i);
+      c.itens = c.itens.filter((x) => x.id !== b.dataset.i);
+      if (it) soltarFotos(it.fotos);
+      S.confirmar = null; markDirty(); render(); return;
+    }
+    case 'rmcomodo': {
+      const k = 'c' + b.dataset.c;
+      if (S.confirmar !== k) { S.confirmar = k; b.textContent = 'Confirmar exclusão'; return; }
+      const c = acharComodo(b.dataset.c); if (!c) return;
+      v.comodos = v.comodos.filter((x) => x.id !== c.id);
+      soltarFotos(c.itens.flatMap((i) => i.fotos));
+      S.confirmar = null; markDirty(); render(); return;
+    }
+    case 'arquivar':
+      if (v && !v._novo) { v.arquivada = !v.arquivada; markDirty(); await flush(); render(); toast(v.arquivada ? 'Vistoria arquivada. Ela fica na aba Arquivadas.' : 'Vistoria de volta à lista principal.'); }
+      return;
+    case 'excluir':
+      if (!S.souDono) return;
+      if (S.confirmar !== 'vist') { S.confirmar = 'vist'; b.textContent = 'Toque de novo para excluir de vez'; return; }
+      return excluirVistoria();
+    case 'permissoes': try { await S.permissions.manage(); } catch (_) { toast('Abra o menu Permissões do artefato no Claude para rever o que foi liberado.'); } return;
+  }
+});
+document.getElementById('toast-root').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-act]');
+  if (b && b.dataset.act === 'desfazer') { document.getElementById('toast-root').innerHTML = ''; desfazerCorrecao(); }
+});
+function soltarFotos(codes) {
+  const v = S.v;
+  const usados = new Set();
+  v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((f) => usados.add(f))));
+  v.fotosSoltas = v.fotosSoltas || [];
+  for (const code of codes) if (!usados.has(code) && !v.fotosSoltas.includes(code)) v.fotosSoltas.push(code);
+}
+function setCaminho(obj, caminho, valor) {
+  const ps = caminho.split('.');
+  let o = obj;
+  for (let i = 0; i < ps.length - 1; i++) o = o[ps[i]] = o[ps[i]] || {};
+  o[ps[ps.length - 1]] = valor;
+}
+app.addEventListener('input', (ev) => {
+  const t = ev.target;
+  const v = S.v;
+  if (t.dataset.bind && v) {
+    setCaminho(v, t.dataset.bind, t.value);
+    if (t.dataset.bind === 'loteAtual.texto' && S.msg && S.msg.onde === 'lote' && !S.msg.fixa) { S.msg = null; const el = document.getElementById('msg-lote'); if (el) el.innerHTML = ''; }
+    markDirty();
+    return;
+  }
+  if (t.dataset.cfg) { if (S.souDono) { S.cfg[t.dataset.cfg] = t.value; salvarCfg(); atualizarPrevia(); } return; }
+  if (t.hasAttribute('data-novapasta')) { S.novaPasta = t.value; return; }
+  if (t.dataset.cor) { if (S.souDono && hexOk(t.value)) { S.cfg[t.dataset.cor] = t.value; aplicarTema(); atualizarPrevia(); } return; }
+  if (t.hasAttribute('data-corr')) { S.correcao = t.value; return; }
+  if (t.dataset.cmp && v && v.comparacao && t.tagName === 'TEXTAREA') {
+    const x = v.comparacao.itens.find((i) => i.id === t.dataset.cmp);
+    if (x) { x[t.dataset.f] = t.value; markDirty(); }
+    return;
+  }
+  if (t.dataset.c && v && t.type !== 'checkbox' && t.tagName !== 'SELECT') {
+    const c = acharComodo(t.dataset.c); if (!c) return;
+    if (t.dataset.i) { const it = c.itens.find((x) => x.id === t.dataset.i); if (it) it[t.dataset.f] = t.value; }
+    else c[t.dataset.f] = t.value;
+    markDirty();
+  }
+});
+app.addEventListener('change', (ev) => {
+  const t = ev.target;
+  const v = S.v;
+  if (t.hasAttribute('data-logo')) { const f = t.files && t.files[0]; t.value = ''; if (f) trocarLogo(f); return; }
+  if (t.dataset.cor) { if (S.souDono) salvarCfg(true); return; }
+  if (t.dataset.rev !== undefined && S.revisao) { S.revisao.marcadas[+t.dataset.rev] = t.checked; return; }
+  if (t.hasAttribute('data-pick')) { const fs = t.files ? [...t.files] : []; t.value = ''; if (fs.length) aoEscolherFotos(fs); return; }
+  if (t.dataset.sel === 'entradaId' && v) {
+    v.entradaId = t.value;
+    const e = entradaDe(v);
+    if (e) {
+      if (!v.endereco.trim()) v.endereco = e.endereco || '';
+      if (!v.descricao.trim()) v.descricao = e.descricao || '';
+      if (!v.locador.trim()) v.locador = e.locador || '';
+      if (!v.locatario.trim()) v.locatario = e.locatario || '';
+      if (!v.codigo.trim()) v.codigo = e.codigo || '';
+    }
+    markDirty(); render(); return;
+  }
+  if (t.dataset.cmp && v && v.comparacao && t.tagName === 'SELECT') {
+    const x = v.comparacao.itens.find((i) => i.id === t.dataset.cmp);
+    if (x) { x.situacao = t.value; markDirty(); const row = t.closest('.cmp-row'); if (row) row.className = 'cmp-row sit-' + t.value; }
+    return;
+  }
+  if (t.dataset.c && v && (t.type === 'checkbox' || t.tagName === 'SELECT')) {
+    const c = acharComodo(t.dataset.c); if (!c) return;
+    const it = c.itens.find((x) => x.id === t.dataset.i); if (!it) return;
+    if (t.type === 'checkbox') it.critico = t.checked; else it[t.dataset.f] = t.value;
+    markDirty();
+    const box = t.closest('.item'); if (box) box.className = 'item est-' + (it.estado || '');
+  }
+});
+window.addEventListener('pagehide', () => { if (S.v && !S.v._novo) flush(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && S.v && !S.v._novo) flush(); });
+
+/* ---------- início ---------- */
+aplicarTema();
+render();
+(async () => {
+  const c = window.claude;
+  if (!c || typeof c.use !== 'function') { S.semRuntime = true; S.pronto = true; render(); return; }
+  const nomes = ['db', 'user', 'sample', 'assets', 'mcp', 'downloads', 'permissions'];
+  const res = await Promise.all(nomes.map((n) => c.use(n).catch(() => null)));
+  nomes.forEach((n, i) => { S[n] = res[i]; });
+  if (S.user) {
+    try { const w = await S.user.can('data.write'); S.podeEscrever = w === false ? false : w === true ? true : null; } catch (_) { S.podeEscrever = null; }
+    try { S.meuNome = (await S.user.name()) || ''; } catch (_) {}
+    try { S.meuId = (await S.user.id()) || null; } catch (_) {}
+    try { S.souDono = !!(await S.user.isOwner()); } catch (_) {}
+  } else S.podeEscrever = null;
+  if (S.sample) { try { const l = await S.sample.limits(); S.imgMax = (l && l.images && l.images.maxCount) || 0; } catch (_) { S.imgMax = 0; } }
+  if (S.mcp) { try { const t = await S.mcp.listTools(); S.fileArgs = !!(t && t.fileArgs); } catch (_) {} }
+  if (S.db) {
+    try { const d = await S.db.doc('config/geral').get(); if (d.exists) S.cfg = { ...CFG_PADRAO, ...d.data() }; } catch (_) {}
+    aplicarTema();
+    S.db.collection('vistorias').orderBy('atualizadoEm', 'desc').limit(300).onSnapshot((snap) => {
+      S.lista = snap.docs.map((d) => d.data()).filter(Boolean);
+      S.listaCarregada = true; S.listaErro = null;
+      if (S.tela === 'home' && !S.busy) render();
+    }, (e) => { S.listaErro = e; S.listaCarregada = true; if (S.tela === 'home') render(); });
+  }
+  S.pronto = true;
+  if (precisaInicio()) { S.tela = 'inicio'; if (S.cfg.configurado !== true) S.cfg.configurado = false; }
+  render();
+})();
+})();
+</script>
