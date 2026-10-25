@@ -303,7 +303,7 @@ const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'
 const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
 const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
 /* Versão do app: atualize junto com o CHANGELOG.md e a tag do GitHub a cada mudança. */
-const VERSAO = '1.1.0';
+const VERSAO = '1.2.0';
 const MAX_FOTOS = 20;
 const DRIVE = 'Google Drive';
 const FOLDER = 'application/vnd.google-apps.folder';
@@ -386,7 +386,7 @@ const S = {
   podeEscrever: true, imgMax: 0, fileArgs: false, meuNome: '', meuId: null, souDono: false,
   cfgOcupado: false, cfgAviso: '', novaPasta: '', nomes: {},
   verif: null, verificando: false, revisao: null, coresSugeridas: null,
-  modoEnvio: null, avisoFotos: null,
+  modoEnvio: null, avisoFotos: null, aprovado: null, conferencia: null,
   lista: [], listaCarregada: false, listaErro: null,
   cfg: { ...CFG_PADRAO },
   tela: 'home', filtro: 'todas',
@@ -892,10 +892,10 @@ function promptLote(v, work, n, fotos, texto, parte, de, comImagens) {
     '',
     'Responda apenas com JSON neste formato:',
     '{"comodos":[{"nome":"Cozinha","observacoes":"","itens":[{"nome":"Torneira da pia","estado":"ruim","descricao":"Torneira metálica cromada, com vazamento contínuo na base.","fotos":["L01-F02"],"critico":true}]}],"fotosSemItem":[],"resumo":"Uma frase sobre o que este lote registrou.","duvidas":[]}',
-    'Valores de "estado": "novo", "bom", "regular", "ruim" ou "nao_se_aplica". Deixe "observacoes" vazio quando não houver nada novo sobre o cômodo como um todo.');
+    'Valores de "estado": "novo", "bom", "regular", "ruim" ou "nao_se_aplica". Use "nao_se_aplica" só quando o item não existe no imóvel. Quando o estado não foi dito e não dá para ver com clareza na foto, deixe "estado" vazio ("") e pergunte em "duvidas". Deixe "observacoes" vazio quando não houver nada novo sobre o cômodo como um todo.');
   return linhas.join('\n');
 }
-function aplicarResultado(work, r, codesDoLote, todos) {
+function aplicarResultado(work, r, codesDoLote, todos, opts) {
   const mudancas = [];
   const ligados = new Set();
   for (const rc of Array.isArray(r && r.comodos) ? r.comodos : []) {
@@ -910,9 +910,13 @@ function aplicarResultado(work, r, codesDoLote, todos) {
       let it = c.itens.find((x) => norm(x.nome) === norm(inome));
       const novo = !it;
       if (!it) { it = { id: uid(), nome: inome, estado: '', descricao: '', fotos: [], critico: false }; c.itens.push(it); }
-      if (ESTADO_OK.has(ri.estado)) it.estado = ri.estado;
-      if (ri.descricao && String(ri.descricao).trim()) it.descricao = String(ri.descricao).trim();
-      if (typeof ri.critico === 'boolean') it.critico = ri.critico;
+      // Campos que a pessoa mudou à mão não são trocados pelo Claude, a não ser que ela peça (correção falada citando o item).
+      const liberado = !!(opts && opts.liberar && opts.liberar(it, c));
+      const man = it.manual && !liberado ? it.manual : {};
+      if (ESTADO_OK.has(ri.estado) && !('estado' in man)) it.estado = ri.estado;
+      if (ri.descricao && String(ri.descricao).trim() && !('descricao' in man)) it.descricao = String(ri.descricao).trim();
+      if (typeof ri.critico === 'boolean' && !('critico' in man)) it.critico = ri.critico;
+      if (liberado && it.manual) for (const f of Object.keys(it.manual)) it.manual[f] = it[f];
       for (const raw of Array.isArray(ri.fotos) ? ri.fotos : []) {
         const code = codigoCanon(raw);
         if (!code || !todos.has(code)) continue;
@@ -1216,7 +1220,7 @@ async function corrigir() {
       else c.itens = c.itens.filter((i) => norm(i.nome) !== norm(rm.item));
     }
     const work = { comodos: v.comodos, fotosSoltas: v.fotosSoltas || [] };
-    aplicarResultado(work, r, [], new Set(v.fotos.map((f) => f.code)));
+    aplicarResultado(work, r, [], new Set(v.fotos.map((f) => f.code)), { liberar: (it) => norm(instr).includes(norm(it.nome)) });
     const usados = new Set();
     v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((f) => usados.add(f))));
     v.fotosSoltas = [...new Set([...work.fotosSoltas, ...v.fotos.map((f) => f.code).filter((code) => !usados.has(code) && !v.fotos.find((f) => f.code === code).pendente)])];
@@ -1258,10 +1262,14 @@ async function finalizar() {
       { k: 'fotos', txt: 'Enviando ao Drive as fotos que faltavam', st: faltam.length ? 'wait' : 'skip', det: faltam.length ? '' : 'todas já estão lá' },
       { k: 'img', txt: 'Preparando as fotos do laudo', st: 'wait', det: '' },
       { k: 'pdf', txt: 'Montando o PDF', st: 'wait', det: '' },
+      { k: 'conf', txt: 'Revisor de fidelidade: conferindo o PDF com o que foi preenchido', st: 'wait', det: '' },
+      { k: 'visual', txt: 'Revisor visual: olhando as páginas do PDF', st: 'wait', det: '' },
       { k: 'up', txt: 'Salvando o PDF na pasta da vistoria', st: 'wait', det: '' },
       { k: 'copia', txt: 'Cópia de segurança dos dados no Drive', st: 'wait', det: '' },
     ],
   };
+  S.conferencia = null;
+  if (!S.aprovado || S.aprovado.vid !== v.id) S.aprovado = fotografarPreenchimento(v);
   render();
   window.scrollTo(0, 0);
   let driveOk = true;
@@ -1287,32 +1295,24 @@ async function finalizar() {
   }
   const nome = nomePDF(v);
   S.pdf = { vid: v.id, blob, nome };
-  if (driveOk) {
-    setPasso('up', 'run');
-    try {
-      const f = await enviarArquivo(blob, nome, 'application/pdf', v.drive.pasta, 'laudo-vistoria.pdf');
-      v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = nome;
-      v.pdfVersao = (v.pdfVersao || 0) + 1;
-      setPasso('up', 'ok', '');
-    } catch (e) {
-      setPasso('up', 'err', erroDrive(e));
-      S.laudoAviso = 'O PDF ficou pronto, mas não foi para o Drive: ' + erroDrive(e) + ' Baixe o arquivo e arraste para a pasta da vistoria.';
-    }
-  } else {
-    setPasso('up', 'skip', 'sem Drive');
-    S.laudoAviso = 'O PDF ficou pronto, mas o Google Drive não está disponível agora. Baixe o arquivo e guarde na pasta da vistoria.';
+  let conf;
+  try { conf = await conferirPDF(v, blob, (k, det) => setPasso(k, 'run', det)); }
+  catch (e) { conf = { fidelidade: [], mudancas: [], visual: [], visualRodou: false, visualErro: '', falhou: (e && e.message) || 'erro' }; }
+  if (conf.falhou) setPasso('conf', 'skip', 'não rodou: ' + conf.falhou);
+  else setPasso('conf', conf.fidelidade.length ? 'err' : 'ok', conf.fidelidade.length ? plural(conf.fidelidade.length, 'diferença encontrada', 'diferenças encontradas') : 'o PDF bate com o que foi preenchido');
+  setPasso('visual', conf.visualRodou ? (conf.visual.length ? 'err' : 'ok') : 'skip', conf.visualRodou ? (conf.visual.length ? plural(conf.visual.length, 'ponto', 'pontos') : 'nenhum problema de aparência') : conf.visualErro || 'indisponível nesta tela');
+  v.conferido = { em: Date.now(), fidelidade: conf.falhou ? null : conf.fidelidade.length, visual: conf.visualRodou ? conf.visual.length : null };
+  const mudEstado = conf.mudancas.filter((m) => m.campo === 'estado' || m.campo === 'critico');
+  if (conf.fidelidade.length || conf.visual.length || mudEstado.length) {
+    S.conferencia = { vid: v.id, ...conf, blob, nome };
+    markDirty();
+    await flush();
+    S.busy = null;
+    render();
+    window.scrollTo(0, 0);
+    return;
   }
-  v.status = 'concluida'; v.concluidaEm = Date.now();
-  if (driveOk) {
-    setPasso('copia', 'run');
-    const rCopia = await salvarCopia(v, `laudo versão ${v.pdfVersao || 1}`);
-    setPasso('copia', rCopia.ok ? 'ok' : 'err', rCopia.ok ? 'na subpasta Dados' : erroDrive(rCopia.erro));
-  } else setPasso('copia', 'skip', 'sem Drive');
-  markDirty();
-  await flush();
-  S.busy = null;
-  render();
-  window.scrollTo(0, 0);
+  return salvarLaudo(v, blob, nome, false);
 }
 async function baixarPDF() {
   const v = S.v;
@@ -1390,16 +1390,18 @@ async function revisorClaude(v, signal) {
       let atual = '';
       if (x.campo === 'comodo') atual = c ? c.nome : '';
       else if (it) atual = x.campo === 'estado' ? estadoLabel(it.estado) : x.campo === 'critico' ? (it.critico ? 'sim' : 'não') : String(it[x.campo] || '');
-      return { comodo: String(x.comodo || ''), item: String(x.item || ''), campo: x.campo, valorNovo: String(x.valorNovo).trim(), motivo: String(x.motivo || ''), atual, valida: x.campo === 'comodo' ? !!c : !!it };
+      const protegida = !!(it && it.manual && x.campo in it.manual);
+      return { comodo: String(x.comodo || ''), item: String(x.item || ''), campo: x.campo, valorNovo: String(x.valorNovo).trim(), motivo: String(x.motivo || ''), atual, protegida, valida: x.campo === 'comodo' ? !!c : !!it };
     })
-    .filter((x) => x.valida && !(x.campo === 'estado' && !ESTADO_OK.has(x.valorNovo)));
+    .filter((x) => x.valida && !(x.campo === 'estado' && (!ESTADO_OK.has(x.valorNovo) || x.valorNovo === 'nao_se_aplica')));
   return { resumo: String(r.resumo || '').trim(), correcoes };
 }
 async function revisarLaudo() {
   const v = S.v;
   if (!v || S.busy) return;
   await flush();
-  S.aba = 'revisao'; S.revisao = null;
+  S.aba = 'revisao'; S.revisao = null; S.conferencia = null;
+  S.aprovado = fotografarPreenchimento(v);
   const pontos = checagens(v);
   let rev = { resumo: '', correcoes: [] }, erro = '';
   if (S.sample) {
@@ -1411,7 +1413,7 @@ async function revisarLaudo() {
     S.busy = null;
   }
   if (!pontos.length && !rev.correcoes.length && !erro) { toast('O revisor não encontrou nada fora do padrão.'); return finalizar(); }
-  S.revisao = { vid: v.id, pontos, resumo: rev.resumo, correcoes: rev.correcoes, marcadas: rev.correcoes.map(() => true), erro };
+  S.revisao = { vid: v.id, pontos, resumo: rev.resumo, correcoes: rev.correcoes, marcadas: rev.correcoes.map((x) => !x.protegida && ['nome', 'descricao', 'comodo'].includes(x.campo)), erro };
   render();
   const el = document.getElementById('painel-revisao');
   if (el) el.scrollIntoView({ block: 'start' });
@@ -1428,6 +1430,7 @@ function aplicarRevisao(aplicar) {
       if (x.campo === 'estado') it.estado = x.valorNovo;
       else if (x.campo === 'critico') it.critico = /^(true|sim|1)$/i.test(x.valorNovo);
       else it[x.campo] = x.valorNovo;
+      if (it.manual && x.campo in it.manual) it.manual[x.campo] = it[x.campo];
     }
     for (const { x } of ordem.filter((o) => o.x.campo === 'comodo')) {
       const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
@@ -1449,7 +1452,7 @@ function viewPainelRevisao() {
     ${r.resumo ? `<p class="lede">${esc(r.resumo)}</p>` : ''}
     ${r.erro ? aviso('O revisor automático não rodou agora. ' + r.erro + ' As checagens abaixo foram feitas pelo próprio app.') : ''}
     ${r.pontos.length ? `<div class="stack"><p class="label">Para você resolver</p><ul class="bullets">${r.pontos.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
-    ${r.correcoes.length ? `<div class="stack"><p class="label">Correções sugeridas (marque as que quer aplicar)</p><div class="cmp">${r.correcoes.map((x, n) => `<label class="cmp-row rev-row"><span class="chk"><input type="checkbox" data-rev="${n}" ${r.marcadas[n] ? 'checked' : ''}><b>${esc(x.campo === 'comodo' ? x.comodo : x.comodo + ' · ' + x.item)}</b></span><span class="de-para">${esc(nomeCampo[x.campo])}: ${esc(String(x.atual || 'vazio').slice(0, 160))} → ${esc(String(valor(x)).slice(0, 300))}</span>${x.motivo ? `<span class="sug">${esc(x.motivo)}</span>` : ''}</label>`).join('')}</div></div>` : ''}
+    ${r.correcoes.length ? `<div class="stack"><p class="label">Correções sugeridas (marque as que quer aplicar)</p><div class="cmp">${r.correcoes.map((x, n) => `<label class="cmp-row rev-row"><span class="chk"><input type="checkbox" data-rev="${n}" ${r.marcadas[n] ? 'checked' : ''}><b>${esc(x.campo === 'comodo' ? x.comodo : x.comodo + ' · ' + x.item)}</b></span><span class="de-para">${esc(nomeCampo[x.campo])}: ${esc(String(x.atual || 'vazio').slice(0, 160))} → ${esc(String(valor(x)).slice(0, 300))}</span>${x.motivo ? `<span class="sug">${esc(x.motivo)}</span>` : ''}${x.protegida ? '<span class="sug">Você mudou isso à mão. Só marque se quiser trocar.</span>' : ['estado', 'critico'].includes(x.campo) ? '<span class="sug">Decisão de quem vistoriou: marque só se concordar.</span>' : ''}</label>`).join('')}</div></div>` : ''}
     <div class="stack">
       ${r.correcoes.length ? '<button class="btn primary block" data-act="rev-aplicar">Aplicar as marcadas e gerar o PDF</button><button class="btn block" data-act="rev-sem">Gerar o PDF sem mudar nada</button>' : '<button class="btn primary block" data-act="rev-sem">Gerar o PDF assim mesmo</button>'}
       <button class="btn ghost block" data-act="rev-voltar">Voltar e corrigir eu mesmo</button>
@@ -1632,7 +1635,7 @@ async function trocarLogo(file) {
       S.blobs.set(upL.id, prep.limpa);
       usar = upL.id; alternativa = up.id;
     }
-    S.cfg.logoAsset = usar; S.cfg.logoAlternativa = alternativa; S.cfg.logoSemFundo = !!alternativa;
+    S.cfg.logoAsset = usar; S.cfg.logoAlternativa = alternativa; S.cfg.logoSemFundo = !!alternativa; S.cfg.logoTratada = true;
     if (prep) S.cfg.estiloCapa = prep.estilo;
     try { S.coresSugeridas = await sugerirCores(prep && prep.limpa ? prep.limpa : blob); } catch (_) { S.coresSugeridas = null; }
     if (S.tela === 'inicio' && S.coresSugeridas && S.coresSugeridas[0]) {
@@ -1765,6 +1768,225 @@ async function concluirInicio() {
   render();
 }
 
+/* ---------- o que a pessoa preenche manda ---------- */
+function marcarManual(it, campo) {
+  if (!it || !campo) return;
+  it.manual = it.manual || {};
+  it.manual[campo] = it[campo];
+}
+function fotografarPreenchimento(v) {
+  const itens = {};
+  v.comodos.forEach((c) => c.itens.forEach((i) => { itens[i.id] = { comodo: c.nome, nome: i.nome, estado: i.estado, descricao: i.descricao, critico: !!i.critico }; }));
+  return { vid: v.id, em: Date.now(), itens };
+}
+function mudancasDepoisDaAprovacao(v) {
+  const a = S.aprovado && S.aprovado.vid === v.id ? S.aprovado : null;
+  if (!a) return [];
+  const lista = [];
+  v.comodos.forEach((c) => c.itens.forEach((i) => {
+    const antes = a.itens[i.id];
+    if (!antes) return;
+    for (const campo of ['estado', 'nome', 'descricao', 'critico']) {
+      const x = campo === 'critico' ? !!antes.critico : antes[campo] || '';
+      const y = campo === 'critico' ? !!i.critico : i[campo] || '';
+      if (x !== y) lista.push({ id: i.id, comodo: c.nome, item: i.nome, campo, antes: x, depois: y });
+    }
+  }));
+  return lista;
+}
+function valorLegivel(campo, val) {
+  if (campo === 'estado') return estadoLabel(val);
+  if (campo === 'critico') return val ? 'sim' : 'não';
+  return String(val || 'vazio').slice(0, 140);
+}
+async function tratarLogoSalva() {
+  try {
+    const blob = await pegarBlob(S.cfg.logoAsset);
+    const prep = await prepararLogo(blob);
+    if (prep.limpa) {
+      const up = await S.assets.upload(prep.limpa, { type: 'image/png' });
+      S.blobs.set(up.id, prep.limpa);
+      S.cfg.logoAlternativa = S.cfg.logoAsset; S.cfg.logoAsset = up.id; S.cfg.logoSemFundo = true;
+    }
+    if (!S.cfg.estiloCapa) S.cfg.estiloCapa = prep.estilo;
+    S.cfg.logoTratada = true;
+    aplicarTema();
+    await salvarCfg(true);
+    if (!S.busy) render();
+    if (prep.limpa) toast(`Atualizei a logo: tirei o fundo branco e escolhi a capa ${S.cfg.estiloCapa === 'clara' ? 'clara' : 'escura'}. Dá para mudar em Configurações.`);
+  } catch (_) {}
+}
+
+/* Leitor de PDF (pdf.js) carregado só na hora da conferência, sem pesar no uso normal do app. */
+function carregarScript(src) {
+  return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = () => res(); el.onerror = () => rej(new Error('Não consegui carregar o leitor de PDF.')); document.head.appendChild(el); });
+}
+async function carregarLeitorPDF() {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');
+  await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  if (!window.pdfjsLib) throw new Error('O leitor de PDF não carregou.');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return window.pdfjsLib;
+}
+async function lerPDF(blob, maxImagens) {
+  const lib = await carregarLeitorPDF();
+  const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false, useSystemFonts: true }).promise;
+  const paginas = [], imagens = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const pg = await pdf.getPage(n);
+    const tc = await pg.getTextContent();
+    paginas.push(tc.items.map((i) => i.str).filter((x) => String(x).trim()).join('\n'));
+    if (imagens.length < maxImagens) {
+      const vp = pg.getViewport({ scale: 1.4 });
+      const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+      const im = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.8));
+      if (im) imagens.push(im);
+    }
+  }
+  return { paginas, imagens, total: pdf.numPages };
+}
+/* Revisor de fidelidade: lê o texto do PDF pronto e confere, item por item, se bate com o que está no app. */
+function conferirFidelidade(v, paginas) {
+  // Compara sem espaços: os rótulos do PDF usam letras espaçadas, e o leitor devolve "B O M" em vez de "BOM".
+  const N = (x) => pdfTexto(x).replace(/\s+/g, '').toUpperCase();
+  const linhas = paginas.join('\n').split('\n').map(N).filter(Boolean);
+  const tudo = linhas.join('');
+  const rotulos = ESTADOS.map((e) => N(e[1])).concat([N('Sem estado')]);
+  const problemas = [];
+  for (const [rot, val] of [['O endereço', v.endereco], ['O nome do locador', v.locador], ['O nome do locatário', v.locatario], ['O nome do vistoriador', v.vistoriador], ['A data da vistoria', dataLonga(v.data)]]) {
+    if (String(val || '').trim() && !tudo.includes(N(val))) problemas.push(`${rot} ("${val}") não aparece no PDF.`);
+  }
+  let cursor = 0;
+  for (const c of v.comodos) {
+    let ic = -1;
+    for (let k = cursor; k < linhas.length - 1; k++) { if (linhas[k] === N('Cômodo') && linhas[k + 1].startsWith(N(c.nome).slice(0, 40))) { ic = k + 1; break; } }
+    if (ic < 0) { problemas.push(`O cômodo "${c.nome}" não aparece no PDF.`); continue; }
+    cursor = ic + 1;
+    for (const it of c.itens) {
+      const nomeN = N(it.nome).slice(0, 40);
+      let ii = -1;
+      for (let k = cursor; k < linhas.length; k++) { if (linhas[k] === N('Cômodo')) break; if (linhas[k].startsWith(nomeN) || (linhas[k].length >= 6 && nomeN.startsWith(linhas[k]))) { ii = k; break; } }
+      if (ii < 0) { problemas.push(`${c.nome}, ${it.nome}: o item não aparece no PDF.`); continue; }
+      const prox = linhas.slice(ii + 1, ii + 5).join('|');
+      const achado = rotulos.filter((r) => prox.includes(r)).sort((a, b) => prox.indexOf(a) - prox.indexOf(b))[0] || '';
+      const esperado = N(estadoLabel(it.estado));
+      if (achado !== esperado) problemas.push(`${c.nome}, ${it.nome}: no app está "${estadoLabel(it.estado)}", mas o PDF mostra "${achado ? ESTADOS.concat([['', 'Sem estado']]).find((e) => N(e[1]) === achado)[1] : 'nenhum estado'}".`);
+      if (it.manual && 'estado' in it.manual && it.manual.estado !== it.estado) problemas.push(`${c.nome}, ${it.nome}: você marcou "${estadoLabel(it.manual.estado)}", mas o laudo ficou com "${estadoLabel(it.estado)}".`);
+      for (const code of it.fotos) if (!tudo.includes(code)) problemas.push(`${c.nome}, ${it.nome}: a foto ${code} não aparece no PDF.`);
+      cursor = ii + 1;
+    }
+  }
+  return problemas;
+}
+/* Revisor visual: o Claude olha as primeiras páginas do PDF como imagem e aponta problemas de aparência. */
+async function revisorVisual(v, imagens, signal) {
+  const lista = v.comodos.map((c) => `${c.nome}: ` + c.itens.map((i) => `${i.nome} = ${estadoLabel(i.estado)}`).join('; ')).join('\n');
+  const prompt = [
+    'Você é o revisor visual dos laudos de vistoria de uma imobiliária. As imagens anexadas são as primeiras páginas do PDF final, na ordem.',
+    'Confira e aponte só problemas reais, que um cliente notaria:',
+    '1. Logo: está legível e combina com a capa? Aponte se ela aparece dentro de um retângulo ou caixa de fundo que destoa da capa, ou se some por falta de contraste.',
+    '2. Capa: o título e os textos têm bom contraste com o fundo?',
+    '3. Texto cortado, sobreposto ou saindo da margem.',
+    '4. Fotos: aparecem, sem distorção e com legenda.',
+    '5. Estados: o rótulo de estado ao lado de cada item bate com esta lista do app?',
+    lista,
+    '',
+    'Responda apenas com JSON neste formato: {"problemas":[{"pagina":1,"tipo":"logo","descricao":"A logo aparece dentro de um retângulo branco sobre a capa escura.","sugestao":"Usar a capa clara."}]}',
+    'Valores de "tipo": "logo", "contraste", "texto", "foto", "estado" ou "outro". Use uma lista vazia quando estiver tudo certo.',
+  ].join('\n');
+  const r = await S.sample.json(prompt, { signal, modelTier: 'default', images: imagens });
+  if (!r || !Array.isArray(r.problemas)) throw { code: 'invalid_json' };
+  return r.problemas.filter((x) => x && x.descricao).slice(0, 12).map((x) => ({ pagina: +x.pagina || 0, tipo: String(x.tipo || 'outro'), descricao: String(x.descricao), sugestao: String(x.sugestao || '') }));
+}
+async function conferirPDF(v, blob, prog) {
+  const maxImg = S.sample && S.imgMax > 0 ? Math.min(3, S.imgMax) : 0;
+  prog && prog('conf', 'lendo o texto do PDF');
+  const lido = await lerPDF(blob, maxImg);
+  const fidelidade = conferirFidelidade(v, lido.paginas);
+  const mudancas = mudancasDepoisDaAprovacao(v);
+  let visual = [], visualRodou = false, visualErro = '';
+  if (maxImg && lido.imagens.length) {
+    prog && prog('visual', 'o Claude está olhando as páginas');
+    try { visual = await revisorVisual(v, lido.imagens); visualRodou = true; }
+    catch (e) { visualErro = erroClaude(e); }
+  }
+  return { fidelidade, mudancas, visual, visualRodou, visualErro, paginas: lido.total };
+}
+function viewConferencia(v) {
+  const k = S.conferencia;
+  const mudEstado = k.mudancas.filter((m) => m.campo === 'estado' || m.campo === 'critico');
+  const titulo = k.fidelidade.length ? 'O PDF não bate com o que foi preenchido' : 'Os revisores encontraram pontos no PDF';
+  const temCapas = typeof estiloCapa === 'function';
+  const capaAtual = temCapas ? estiloCapa() : '';
+  const temLogo = temCapas && k.visual.some((x) => x.tipo === 'logo' || x.tipo === 'contraste');
+  return `<section class="card" id="conferencia">
+    <p class="kicker"><span class="rule"></span>Conferência do laudo</p>
+    <h2>${esc(titulo)}</h2>
+    <p class="hint">O PDF ainda não foi para o Drive. Veja os pontos abaixo e escolha o que fazer.</p>
+    ${k.fidelidade.length ? `<div class="stack"><p class="label">Revisor de fidelidade: diferenças entre o app e o PDF</p><ul class="bullets">${k.fidelidade.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '<div class="msg ok"><p>Revisor de fidelidade: o PDF bate com o que foi preenchido, item por item.</p></div>'}
+    ${mudEstado.length ? `<div class="stack"><p class="label">Mudanças feitas pelo revisor depois da sua aprovação</p><ul class="bullets">${mudEstado.map((m) => `<li>${esc(m.comodo)}, ${esc(m.item)}: ${esc(m.campo === 'estado' ? 'estado' : 'ponto de atenção')} de "${esc(valorLegivel(m.campo, m.antes))}" para "${esc(valorLegivel(m.campo, m.depois))}"</li>`).join('')}</ul><div class="row"><button class="btn sm" data-act="conf-desfazer">Desfazer essas mudanças e gerar de novo</button></div></div>` : ''}
+    ${k.visual.length ? `<div class="stack"><p class="label">Revisor visual</p><ul class="bullets">${k.visual.map((x) => `<li>${x.pagina ? `Página ${x.pagina}: ` : ''}${esc(x.descricao)}${x.sugestao ? ` <span class="muted">Sugestão: ${esc(x.sugestao)}</span>` : ''}</li>`).join('')}</ul>${temLogo && S.souDono ? `<div class="row"><button class="btn sm" data-act="conf-capa" data-val="${capaAtual === 'clara' ? 'escura' : 'clara'}">Usar a capa ${capaAtual === 'clara' ? 'escura' : 'clara'} e gerar de novo</button></div>` : ''}</div>` : k.visualRodou ? '<div class="msg ok"><p>Revisor visual: nenhum problema de aparência.</p></div>' : k.visualErro ? aviso('O revisor visual não rodou agora. ' + k.visualErro) : ''}
+    <div class="stack">
+      <button class="btn primary block" data-act="conf-revisao">Voltar para a revisão e corrigir</button>
+      <button class="btn block" data-act="conf-gerar">Gerar o PDF de novo</button>
+      <button class="btn ghost block" data-act="conf-salvar">${k.fidelidade.length ? 'Salvar no Drive mesmo com as diferenças' : 'Salvar no Drive assim mesmo'}</button>
+    </div>
+  </section>`;
+}
+async function salvarLaudo(v, blob, nome, comPainel) {
+  if (comPainel) {
+    S.busy = { vid: v.id, titulo: 'Salvando o laudo', podeParar: false, passos: [
+      { k: 'up', txt: 'Salvando o PDF na pasta da vistoria', st: 'run', det: '' },
+      { k: 'copia', txt: 'Cópia de segurança dos dados no Drive', st: 'wait', det: '' },
+    ] };
+    render();
+  }
+  let driveOk = true;
+  try { await garantirPastas(v); } catch (_) { driveOk = false; }
+  S.pdf = { vid: v.id, blob, nome };
+  if (driveOk) {
+    setPasso('up', 'run');
+    try {
+      const f = await enviarArquivo(blob, nome, 'application/pdf', v.drive.pasta, 'laudo-vistoria.pdf');
+      v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = nome;
+      v.pdfVersao = (v.pdfVersao || 0) + 1;
+      setPasso('up', 'ok', '');
+    } catch (e) {
+      setPasso('up', 'err', erroDrive(e));
+      S.laudoAviso = 'O PDF ficou pronto, mas não foi para o Drive: ' + erroDrive(e) + ' Detalhe técnico: ' + detalheErro(e) + ' Baixe o arquivo e arraste para a pasta da vistoria.';
+    }
+  } else {
+    setPasso('up', 'skip', 'sem Drive');
+    S.laudoAviso = 'O PDF ficou pronto, mas o Google Drive não está disponível agora. Baixe o arquivo e guarde na pasta da vistoria.';
+  }
+  v.status = 'concluida'; v.concluidaEm = Date.now();
+  if (driveOk) {
+    setPasso('copia', 'run');
+    const rCopia = await salvarCopia(v, `laudo versão ${v.pdfVersao || 1}`);
+    setPasso('copia', rCopia.ok ? 'ok' : 'err', rCopia.ok ? 'na subpasta Dados' : erroDrive(rCopia.erro));
+  } else setPasso('copia', 'skip', 'sem Drive');
+  S.conferencia = null;
+  markDirty();
+  await flush();
+  S.busy = null;
+  render();
+  window.scrollTo(0, 0);
+}
+function desfazerMudancasRevisor() {
+  const v = S.v, k = S.conferencia;
+  if (!v || !k) return;
+  for (const m of k.mudancas) {
+    const it = v.comodos.flatMap((c) => c.itens).find((i) => i.id === m.id);
+    if (it) { it[m.campo] = m.antes; if (it.manual && m.campo in it.manual) it.manual[m.campo] = m.antes; }
+  }
+  S.conferencia = null;
+  markDirty();
+  return finalizar();
+}
+
 /* ---------- logo ---------- */
 async function logoCanvas(blob, max) {
   const im = await abrirImagem(blob);
@@ -1802,8 +2024,7 @@ async function gerarPDF(v, progresso, pronto) {
     tituloCapa, subCapa: misturar(tituloCapa, rgbDe(corC), 0.35),
     tinta: [22, 30, 38], cinza: [96, 106, 117], linha: [218, 224, 230], fundo: [242, 245, 248],
   };
-  const estilo = estiloCapa(), kc = capaCores(estilo);
-  C.capa = rgbDe(kc.fundo); C.acentoCapa = rgbDe(kc.ac); C.tituloCapa = rgbDe(kc.tit); C.subCapa = rgbDe(kc.sub);
+  let estilo = estiloCapa();
   const COR_EST = { novo: [19, 128, 86], bom: [19, 128, 86], regular: [176, 112, 18], ruim: [190, 72, 40], nao_se_aplica: [120, 132, 125], '': [120, 132, 125] };
   const T = pdfTexto;
   const tipoNome = v.tipo === 'saida' ? 'saída' : 'entrada';
@@ -1866,7 +2087,18 @@ async function gerarPDF(v, progresso, pronto) {
     } catch (_) {}
   }
   let logo = null;
-  if (cfg.logoAsset) { try { logo = await logoPNG(await pegarBlob(cfg.logoAsset)); } catch (_) {} }
+  if (cfg.logoAsset) {
+    try {
+      let lb = await pegarBlob(cfg.logoAsset);
+      if (!cfg.logoTratada && !cfg.logoAlternativa) {
+        const prep = await prepararLogo(lb).catch(() => null);
+        if (prep) { if (prep.limpa) lb = prep.limpa; if (!cfg.estiloCapa) estilo = prep.estilo; }
+      }
+      logo = await logoPNG(lb);
+    } catch (_) {}
+  }
+  const kc = capaCores(estilo);
+  C.capa = rgbDe(kc.fundo); C.acentoCapa = rgbDe(kc.ac); C.tituloCapa = rgbDe(kc.tit); C.subCapa = rgbDe(kc.sub);
   pronto && pronto('img');
   progresso && progresso('pdf', '');
 
@@ -2405,6 +2637,7 @@ function viewRevisao() {
 }
 function viewLaudo() {
   const v = S.v;
+  if (S.conferencia && S.conferencia.vid === v.id) return viewConferencia(v);
   if (S.laudoErro) return `<section class="card"><p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p>${aviso(S.laudoErro, 'bad')}<div class="row2"><button class="btn primary" data-act="gerar-direto">Tentar de novo</button><button class="btn" data-act="aba" data-val="revisao">Voltar para a revisão</button></div></section>`;
   if (v.status !== 'concluida') return `<section class="card"><p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p><p class="muted">O laudo ainda não foi gerado.</p><div><button class="btn primary" data-act="aprovar">Gerar o PDF</button></div></section>`;
   const tipo = v.tipo === 'saida' ? 'saída' : 'entrada';
@@ -2415,6 +2648,7 @@ function viewLaudo() {
     <p class="lede">O laudo de vistoria de ${tipo} do imóvel situado em ${esc(v.endereco)}, realizada em ${esc(dataLonga(v.data))}, foi gerado${v.drive && v.drive.pdf ? ` e arquivado na pasta desta vistoria no Google Drive, junto com ${plural(v.fotos.length, 'foto original', 'fotos originais')}` : ''}.</p>
     <p class="lede">Imprima o laudo para a assinatura do locador e do locatário, ou envie o PDF para assinatura digital. Agradecemos o trabalho em campo.</p>
     ${S.laudoAviso ? aviso(S.laudoAviso) : ''}
+    ${v.conferido ? `<p class="hint">Conferência dos revisores: ${v.conferido.fidelidade === 0 ? 'o PDF bate com o que foi preenchido' : v.conferido.fidelidade ? 'salvo com diferenças apontadas' : 'fidelidade não conferida'}${v.conferido.visual === 0 ? ', sem problemas de aparência' : v.conferido.visual ? ', com pontos de aparência apontados' : ''}.</p>` : ''}
     ${viewFotosDrive(v)}
     <div class="links">
       ${pastaUrl ? `<a class="btn primary block" href="${esc(pastaUrl)}" target="_blank" rel="noopener">Abrir a pasta no Google Drive</a>` : ''}
@@ -2603,6 +2837,11 @@ app.addEventListener('click', async (ev) => {
     case 'rev-voltar': S.revisao = null; render(); window.scrollTo(0, 0); return;
     case 'verificar': return verificarConexoes();
     case 'reenviar-fotos': return reenviarFotos();
+    case 'conf-salvar': if (S.conferencia && v) { const k = S.conferencia; return salvarLaudo(v, k.blob, k.nome, true); } return;
+    case 'conf-desfazer': return desfazerMudancasRevisor();
+    case 'conf-gerar': S.conferencia = null; return finalizar();
+    case 'conf-revisao': if (v) { S.conferencia = null; v.fase = 'revisao'; S.aba = 'revisao'; markDirty(); render(); window.scrollTo(0, 0); } return;
+    case 'conf-capa': if (S.souDono && v) { S.cfg.estiloCapa = b.dataset.val; aplicarTema(); await salvarCfg(true); S.conferencia = null; return finalizar(); } return;
     case 'estilo': if (S.souDono) { S.cfg.estiloCapa = b.dataset.val; aplicarTema(); salvarCfg(true); render(); } return;
     case 'logo-versao': return trocarVersaoLogo();
     case 'concluir-inicio': return concluirInicio();
@@ -2680,7 +2919,7 @@ app.addEventListener('input', (ev) => {
   }
   if (t.dataset.c && v && t.type !== 'checkbox' && t.tagName !== 'SELECT') {
     const c = acharComodo(t.dataset.c); if (!c) return;
-    if (t.dataset.i) { const it = c.itens.find((x) => x.id === t.dataset.i); if (it) it[t.dataset.f] = t.value; }
+    if (t.dataset.i) { const it = c.itens.find((x) => x.id === t.dataset.i); if (it) { it[t.dataset.f] = t.value; marcarManual(it, t.dataset.f); } }
     else c[t.dataset.f] = t.value;
     markDirty();
   }
@@ -2713,6 +2952,7 @@ app.addEventListener('change', (ev) => {
     const c = acharComodo(t.dataset.c); if (!c) return;
     const it = c.itens.find((x) => x.id === t.dataset.i); if (!it) return;
     if (t.type === 'checkbox') it.critico = t.checked; else it[t.dataset.f] = t.value;
+    marcarManual(it, t.type === 'checkbox' ? 'critico' : t.dataset.f);
     markDirty();
     const box = t.closest('.item'); if (box) box.className = 'item est-' + (it.estado || '');
   }
@@ -2748,6 +2988,7 @@ render();
   }
   S.pronto = true;
   if (precisaInicio()) { S.tela = 'inicio'; if (S.cfg.configurado !== true) S.cfg.configurado = false; }
+  if (S.souDono && S.assets && S.cfg.logoAsset && !S.cfg.logoTratada && !S.cfg.logoAlternativa) tratarLogoSalva();
   render();
 })();
 })();

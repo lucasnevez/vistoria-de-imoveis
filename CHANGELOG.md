@@ -2,6 +2,21 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.2.0 (26/10/2026)
+
+**O que a pessoa preenche manda**
+- Quando a pessoa muda um estado, uma descrição ou um ponto de atenção à mão, nenhuma camada do Claude troca esse valor sozinha: nem os lotes seguintes, nem o revisor, nem a correção falada (a não ser que a correção cite o item).
+- O revisor do laudo não sugere mais "Não se aplica". As sugestões de estado e de ponto de atenção chegam desmarcadas: é a pessoa que decide.
+- O Claude só usa "Não se aplica" quando o item não existe no imóvel. Quando o estado não foi dito, ele deixa em branco e pergunta.
+
+**Conferência do laudo antes do Drive**
+- Revisor de fidelidade: lê o texto do PDF pronto e confere, item por item, se o estado de cada item, os nomes, o endereço, a data e as fotos batem com o que está no app.
+- Revisor visual: o Claude olha as primeiras páginas do PDF como imagem e aponta problemas de aparência, como logo sem contraste, texto cortado ou foto faltando.
+- Se algo não bater, ou se o revisor mudou um estado depois da aprovação, o PDF não vai para o Drive antes de a pessoa ver. Dá para desfazer as mudanças do revisor, trocar a capa, voltar para a revisão ou salvar assim mesmo.
+
+**Logo**
+- A logo enviada antes da versão 1.1.0 é tratada sozinha ao abrir o app: sai o fundo branco e entra a capa que combina com ela.
+
 ## 1.1.0 (25/10/2026)
 
 **Logo e capa**
