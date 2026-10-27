@@ -303,7 +303,9 @@ const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'
 const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
 const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
 /* Versão do app: atualize junto com o CHANGELOG.md e a tag do GitHub a cada mudança. */
-const VERSAO = '1.3.0';
+const VERSAO = '1.3.1';
+/* Marca de quem fornece o app, em lugar discreto (fim das Configurações e rodapé do PDF). Vazio = não aparece. */
+const AGENCIA = { nome: '', site: '' };
 const MAX_FOTOS = 20;
 const DRIVE = 'Google Drive';
 const FOLDER = 'application/vnd.google-apps.folder';
@@ -2592,7 +2594,7 @@ async function gerarPDF(v, progresso, pronto) {
     doc.setPage(p);
     doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, H - 12.5, W - M, H - 12.5);
     fonte('normal', 7.5, C.cinza);
-    const rod = [cfg.empresa, creciFmt(cfg.creci), cfg.contato].filter((s) => String(s || '').trim()).join('  |  ');
+    const rod = [cfg.empresa, creciFmt(cfg.creci), cfg.contato, AGENCIA.nome ? 'App: ' + AGENCIA.nome : ''].filter((s) => String(s || '').trim()).join('  |  ');
     doc.text(doc.splitTextToSize(T(rod), CW - 32)[0] || '', M, H - 8.5);
     doc.text(`Página ${p} de ${total}`, W - M, H - 8.5, { align: 'right' });
   }
@@ -3076,7 +3078,7 @@ function viewConfig() {
       <p class="hint">Vale a pena o advogado da imobiliária conferir estes dois textos. As mudanças são salvas sozinhas.</p>
     </section>
     ${S.permissions ? `<section class="card"><h3>Permissões</h3><p class="hint">Na primeira vez, o app pede licença para usar o Claude e o Google Drive. Aqui você revê o que liberou.</p><div><button class="btn" data-act="permissoes">Revisar permissões</button></div></section>` : ''}
-    <p class="hint">Versão do app: ${VERSAO}. Novidades em github.com/lucasnevez/vistoria-de-imoveis.</p>
+    <p class="hint">Versão do app: ${VERSAO}. Novidades em github.com/lucasnevez/vistoria-de-imoveis.${AGENCIA.nome ? ` App fornecido por ${esc(AGENCIA.nome)}${AGENCIA.site ? ` (${esc(AGENCIA.site)})` : ''}.` : ''}</p>
   </main>`;
 }
 function render() {

@@ -2,6 +2,11 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.3.1 (27/10/2026)
+
+- O visual padrão é genérico, para qualquer imobiliária. A identidade de cada uma (logo, cores e capa) entra só em Configurações.
+- Preparado um lugar discreto para a marca de quem fornece o app (fim das Configurações e rodapé do PDF), vazio por enquanto.
+
 ## 1.3.0 (27/10/2026)
 
 **Fotos no Google Drive, agora com garantia**
