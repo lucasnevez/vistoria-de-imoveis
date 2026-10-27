@@ -2,6 +2,26 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.3.0 (27/10/2026)
+
+**Fotos no Google Drive, agora com garantia**
+- Cada foto é enviada e, em seguida, conferida na pasta do Drive. Só conta como enviada depois de conferida.
+- Se o envio falhar, o app reduz a foto e tenta de novo, em até quatro tamanhos, e guarda o tamanho que funcionou para as próximas.
+- O que não subir fica numa fila: o app tenta de novo sozinho, com intervalos crescentes, enquanto a vistoria está aberta, e também quando a internet volta ou a vistoria é reaberta.
+- Painel "Drive: X de Y fotos na pasta Imagens", com o último erro em palavras simples, o detalhe técnico para o suporte e os botões "Sincronizar agora" e "Conferir o Drive".
+- Antes do laudo, um revisor do Drive envia o que falta e confere cada foto. Na lista inicial, a vistoria com foto faltando no Drive aparece marcada.
+- Cada tentativa fica registrada na própria vistoria, para o suporte conseguir ler.
+
+**Editar e excluir lotes**
+- Na lista "Lotes enviados", cada lote tem Editar e Excluir.
+- Editar reabre o lote com as fotos e a fala; dá para tirar ou adicionar fotos e mudar a fala. Ao processar de novo, os itens que o lote tinha colocado no relatório são refeitos. O que foi mudado à mão em outros itens continua.
+- Excluir tira o lote e as fotos do app. O que já estava no Drive fica lá.
+
+**Revisão agêntica do app inteiro**
+- Três revisores independentes leram o app inteiro (fluxo de dados, Drive e sincronização, telas e PDF) e apontaram 58 pontos; os que eram defeitos reais foram corrigidos. Entre eles: itens criados pela correção falada sumiam ao editar um lote; o PDF que não subia ao Drive se perdia ao recarregar; trocar a vistoria de entrada mantinha a comparação antiga; o parecer e a comparação editados à mão eram sobrescritos ao consolidar de novo; uma vistoria apagada podia voltar; sugestões do revisor sobre um mesmo item se perdiam; a conferência do PDF podia confundir um item com a descrição de outro.
+- No laudo em PDF: títulos de seção não ficam mais sozinhos no fim da página, nomes longos não passam por baixo do rótulo de estado, a lista de fotos quebra linha, a legenda das fotos tem duas linhas, o rodapé não cruza com o número da página, e acentos digitados de forma decomposta são preservados.
+- Textos e telas: um nome só para "pontos de atenção", botões citados pelo nome certo, erros do Drive em português, botão "Parar" ao gerar o laudo, aviso claro quando a vistoria não salva, confirmação de exclusão que volta ao normal, e a pasta do Drive não é mais recriada em silêncio.
+
 ## 1.2.0 (26/10/2026)
 
 **O que a pessoa preenche manda**

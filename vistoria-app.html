@@ -103,7 +103,7 @@ input[type="text"], input[type="date"], input:not([type]), select, textarea {
   width: 100%; min-width: 0; background: var(--field); border: 1px solid var(--line-2); border-radius: var(--r); padding: 11px 12px; font-size: 16px; color: var(--fg);
 }
 textarea { resize: vertical; line-height: 1.45; }
-input::placeholder, textarea::placeholder { color: #5E6B78; }
+input::placeholder, textarea::placeholder { color: #8A96A3; }
 input[type="color"] { width: 100%; height: 46px; padding: 4px; background: var(--field); border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -303,7 +303,7 @@ const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'
 const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
 const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
 /* Versão do app: atualize junto com o CHANGELOG.md e a tag do GitHub a cada mudança. */
-const VERSAO = '1.2.0';
+const VERSAO = '1.3.0';
 const MAX_FOTOS = 20;
 const DRIVE = 'Google Drive';
 const FOLDER = 'application/vnd.google-apps.folder';
@@ -342,7 +342,7 @@ function lum(rgb) { const c = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v
 function misturar(a, b, t) { return a.map((x, i) => Math.round(x + (b[i] - x) * t)); }
 function corParaFundoEscuro(h) { let c = rgbDe(h); for (let i = 0; i < 12 && lum(c) < 0.22; i++) c = misturar(c, [255, 255, 255], 0.16); return hexDe(c); }
 function corParaFundoClaro(h) { let c = rgbDe(h); for (let i = 0; i < 12 && lum(c) > 0.2; i++) c = misturar(c, [0, 0, 0], 0.14); return hexDe(c); }
-function tintaSobre(h) { return lum(rgbDe(h)) > 0.45 ? '#0B0F14' : '#FFFFFF'; }
+function tintaSobre(h) { return lum(rgbDe(h)) > 0.179 ? '#0B0F14' : '#FFFFFF'; }
 function corCfg(nome) { return hexOk(S.cfg[nome]) ? S.cfg[nome] : CFG_PADRAO[nome]; }
 function aplicarTema() {
   const r = document.documentElement.style;
@@ -387,6 +387,8 @@ const S = {
   cfgOcupado: false, cfgAviso: '', novaPasta: '', nomes: {},
   verif: null, verificando: false, revisao: null, coresSugeridas: null,
   modoEnvio: null, avisoFotos: null, aprovado: null, conferencia: null,
+  sync: { timer: null, rodando: false, tentativas: 0, proximo: 0, vid: null, ctl: null, p: null },
+  entradasExtra: {},
   lista: [], listaCarregada: false, listaErro: null,
   cfg: { ...CFG_PADRAO },
   tela: 'home', filtro: 'todas',
@@ -425,11 +427,23 @@ function erroDrive(e) {
     case 'server_not_connected': return 'O Google Drive não está conectado na sua conta do Claude. Conecte em claude.ai, Configurações, Conectores, e tente de novo.';
     case 'needs_reauth': return 'A conexão com o Google Drive expirou. Reconecte em claude.ai, Configurações, Conectores.';
     case 'selection_required': return 'Há mais de um Google Drive conectado. Escolha qual usar no aviso do Claude e tente de novo.';
-    case 'not_in_manifest': case 'approval_required': return 'O app precisa da sua permissão para usar o Google Drive. Toque em tentar de novo e permita.';
+    case 'approval_required': return 'O app precisa da sua permissão para usar o Google Drive. Toque de novo no botão que falhou e permita o acesso.';
+    case 'not_in_manifest': return 'O Google Drive está desligado para este app na sua conta. Abra Configurações, toque em Revisar permissões e ligue o Google Drive.';
     case 'blocked_by_policy': return 'A sua organização bloqueou o Google Drive para este app.';
     case 'server_unavailable': case 'upstream_error': return 'O Google Drive não respondeu agora. Tente de novo em instantes.';
-    case 'tool_error': return 'O Google Drive recusou o pedido' + (e.message ? ': ' + String(e.message).slice(0, 160) : '.');
-    case 'grande': return 'O arquivo ficou grande demais para enviar ao Drive por aqui.';
+    case 'tool_error': {
+      const m = String(e.message || '');
+      if (/not found|404/i.test(m)) return 'O Google Drive não encontrou a pasta ou o arquivo. Confira em Configurações se a pasta das vistorias ainda existe.';
+      if (/permission|forbidden|403|insufficient/i.test(m)) return 'O Google Drive negou a permissão. Confira se a conta conectada ao Claude é a mesma que tem acesso à pasta.';
+      if (/too large|entity|413|payload/i.test(m)) return 'O arquivo ficou grande demais para o canal com o Drive. O app tenta de novo com a foto menor.';
+      if (/quota|storage/i.test(m)) return 'O Google Drive está sem espaço ou atingiu o limite de uso.';
+      return 'O Google Drive recusou o pedido. O detalhe técnico está logo abaixo.';
+    }
+    case 'grande': return 'A foto ficou grande demais para o canal com o Drive, mesmo reduzida.';
+    case 'nao_confirmado': return 'O Drive recebeu a foto, mas ela não apareceu na conferência. O app tenta de novo.';
+    case 'sumiu': return 'A foto não está mais na pasta do Drive. O app envia de novo.';
+    case 'decode': return 'Não consegui abrir uma das fotos guardadas no app.';
+    case 'sumiu_app': return 'Uma foto ficou só no aparelho onde foi tirada e não está mais disponível. Ela não vai para o Drive nem para o laudo.';
     case 'formato': return e.message || 'O Drive respondeu num formato inesperado.';
     default: return 'Não consegui falar com o Google Drive' + (e && e.code ? ` (${e.code})` : '') + '.';
   }
@@ -450,7 +464,7 @@ const FATAIS_DRIVE = new Set(['sem_mcp', 'sem_acesso_pasta', 'sem_pasta_definida
 let saveTimer = null;
 let retryTimer = null;
 const saver = { busy: false, again: false, p: null };
-window.addEventListener('online', () => { if (S.save === 'error' && S.v && !S.v._novo) flush(); });
+window.addEventListener('online', () => { if (S.save === 'error' && S.v && !S.v._novo) flush(); if (S.v && !S.v._novo && typeof syncPendente === 'function' && syncPendente(S.v) && !S.sync.rodando) agendarSync(S.v, 2000); });
 function setSave(st, err) {
   S.save = st; S.saveErr = err || null;
   const el = document.getElementById('save');
@@ -537,13 +551,18 @@ async function reduzir(blob, max, q) {
 }
 function paraDataURL(b) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); }); }
 async function paraBase64(b) { return (await paraDataURL(b)).split(',')[1] || ''; }
+function guardarBlob(id, b) {
+  if (S.blobs.has(id)) S.blobs.delete(id);
+  S.blobs.set(id, b);
+  while (S.blobs.size > 40) { const k = S.blobs.keys().next().value; S.blobs.delete(k); }
+}
 async function pegarBlob(asset) {
-  if (S.blobs.has(asset)) return S.blobs.get(asset);
-  if (String(asset).startsWith('local-')) throw { code: 'sumiu', message: 'Esta foto ficou só na tela onde foi tirada.' };
+  if (S.blobs.has(asset)) { const b = S.blobs.get(asset); guardarBlob(asset, b); return b; }
+  if (String(asset).startsWith('local-')) throw { code: 'sumiu_app', message: 'Esta foto ficou só na tela onde foi tirada.' };
   const r = await fetch('/_blob/' + asset);
-  if (!r.ok) throw { code: 'sumiu', message: 'Foto não encontrada.' };
+  if (!r.ok) throw { code: 'sumiu_app', message: 'Foto não encontrada no app.' };
   const b = await r.blob();
-  S.blobs.set(asset, b);
+  guardarBlob(asset, b);
   return b;
 }
 function fotoUrl(asset) {
@@ -555,12 +574,23 @@ function fotoUrl(asset) {
 }
 const fotoPorCodigo = (v, code) => v.fotos.find((f) => f.code === code);
 function renumerar(v, n) {
-  v.fotos.filter((f) => f.lote === n && f.pendente).forEach((f, i) => { f.code = codigo(n, i + 1); });
+  // Foto que já está no Drive mantém o código (o arquivo lá tem esse nome); as outras recebem os números seguintes.
+  const pend = v.fotos.filter((f) => f.lote === n && f.pendente);
+  const fixas = pend.filter((f) => (f.drive || f.fixo) && f.code);
+  let k = fixas.reduce((m, f) => Math.max(m, +(/F(\d+)$/.exec(f.code) || [0, 0])[1]), 0);
+  pend.filter((f) => !((f.drive || f.fixo) && f.code)).forEach((f) => { f.code = codigo(n, ++k); });
+}
+function proximoLote(v) {
+  let m = 0;
+  v.lotes.forEach((l) => { m = Math.max(m, l.n); });
+  v.fotos.forEach((f) => { m = Math.max(m, f.lote || 0); });
+  return m + 1;
 }
 
 async function aoEscolherFotos(files) {
   const v = S.v;
   if (!v || S.busy) return;
+  if (!S.assets) { setMsg('lote', 'Sem permissão para guardar fotos neste app. Peça acesso de edição antes de fotografar.', 'bad'); return; }
   const n = v.loteAtual.n;
   const pend = v.fotos.filter((f) => f.lote === n && f.pendente).length;
   const vaga = MAX_FOTOS - pend - S.subindo;
@@ -574,7 +604,7 @@ async function aoEscolherFotos(files) {
       let id;
       if (S.assets) { const up = await S.assets.upload(r.blob, { type: 'image/jpeg' }); id = up.id; }
       else id = 'local-' + uid();
-      S.blobs.set(id, r.blob);
+      guardarBlob(id, r.blob);
       v.fotos.push({ asset: id, lote: n, pendente: true, w: r.w, h: r.h, code: '' });
       renumerar(v, n);
       markDirty();
@@ -617,13 +647,21 @@ async function drive(tool, input) {
 }
 async function criarPasta(title, parentId) {
   const base = { title }; if (parentId) base.parentId = parentId;
-  let p;
-  try { p = await drive('create_file', { ...base, contentMimeType: FOLDER }); }
-  catch (e) { if (e && e.code === 'tool_error') p = await drive('create_file', { ...base, mimeType: FOLDER }); else throw e; }
+  const p = await drive('create_file', { ...base, contentMimeType: FOLDER });
   const f = arquivoDe(p);
   if (!f) throw { code: 'formato', message: 'O Drive respondeu sem o código da pasta.' };
   return f;
 }
+/* Procura um arquivo ou pasta pelo nome dentro de uma pasta; devolve null se não achar ou se a busca falhar. */
+async function acharNoDrive(title, parentId, mime) {
+  try {
+    const q = `title = '${String(title).replace(/'/g, "\\'")}' and parentId = '${parentId}'` + (mime ? ` and mimeType = '${mime}'` : '');
+    const p = await drive('search_files', { query: q, pageSize: 5, excludeContentSnippets: true });
+    const lista = p && Array.isArray(p.files) ? p.files : [];
+    return lista.find((x) => x && x.id && !x.trashed && (!mime || x.mimeType === mime)) || null;
+  } catch (_) { return null; }
+}
+function semEscrita(f) { return !!(f && (f.canAddChildren === false || (f.capabilities && f.capabilities.canAddChildren === false))); }
 /* A pasta raiz é única da imobiliária: o dono do app cria ou escolhe, compartilha com a equipe,
    e cada pessoa só confere se tem acesso a ela antes de gravar. */
 let raizPromise = null;
@@ -641,7 +679,7 @@ function garantirRaiz() {
       const id = S.cfg.driveRaizId;
       if (id) {
         const f = await lerPasta(id);
-        if (!f || f.mimeType !== FOLDER || f.canAddChildren === false || f.trashed) throw { code: 'sem_acesso_pasta' };
+        if (!f || f.mimeType !== FOLDER || semEscrita(f) || f.trashed) throw { code: 'sem_acesso_pasta' };
         raizConferida = id;
         return id;
       }
@@ -667,13 +705,12 @@ async function prepararPastaRaiz() {
   if (!S.souDono || S.cfgOcupado) return;
   S.cfgOcupado = true; S.cfgAviso = ''; render();
   try {
-    try { await garantirRaiz(); }
+    try { await garantirRaiz(); toast('A pasta das vistorias está acessível no Google Drive.'); }
     catch (e) {
       if (!e || e.code !== 'sem_acesso_pasta') throw e;
-      S.cfg.driveRaizId = ''; S.cfg.driveRaizUrl = ''; S.cfg.driveRaizNome = ''; raizConferida = '';
-      await garantirRaiz();
+      S.cfgAviso = `Não achei a pasta "${nomeRaiz()}" no seu Drive, ou não consigo gravar nela. Se ela foi apagada ou movida para fora da sua conta, crie uma pasta nova. A equipe vai precisar receber a pasta nova compartilhada.`;
+      S.cfgPastaNova = true;
     }
-    toast('A pasta das vistorias está pronta no Google Drive.');
   } catch (e) { S.cfgAviso = erroDrive(e); }
   S.cfgOcupado = false; render();
 }
@@ -686,7 +723,7 @@ async function trocarPastaRaiz() {
   try {
     const f = await lerPasta(m[1]);
     if (!f || f.mimeType !== FOLDER) S.cfgAviso = 'Não achei essa pasta no seu Drive. Confira o link e se a pasta é sua ou está compartilhada com você como Editor.';
-    else if (f.canAddChildren === false) S.cfgAviso = 'Você não tem permissão para criar arquivos nessa pasta.';
+    else if (semEscrita(f)) S.cfgAviso = 'Você não tem permissão para criar arquivos nessa pasta.';
     else {
       S.cfg.driveRaizId = f.id; S.cfg.driveRaizUrl = f.viewUrl || urlPasta(f.id); S.cfg.driveRaizNome = f.title || ''; raizConferida = f.id; S.novaPasta = '';
       await salvarCfg(true);
@@ -705,16 +742,24 @@ function garantirPastas(v) {
     v.drive = v.drive || {};
     if (!v.drive.pasta) {
       const nome = tituloPasta(v);
-      const f = await criarPasta(nome, raiz);
+      const f = (await acharNoDrive(nome, raiz, FOLDER)) || (await criarPasta(nome, raiz));
       v.drive.pasta = f.id; v.drive.pastaUrl = f.viewUrl || urlPasta(f.id); v.drive.nome = nome;
-      markDirty();
+      persistirVistoria(v);
     }
-    if (!v.drive.imagens) { const f = await criarPasta('Imagens', v.drive.pasta); v.drive.imagens = f.id; markDirty(); }
+    if (!v.drive.imagens) { const f = (await acharNoDrive('Imagens', v.drive.pasta, FOLDER)) || (await criarPasta('Imagens', v.drive.pasta)); v.drive.imagens = f.id; persistirVistoria(v); }
     delete S.avisos['drive-' + v.id];
     return v.drive;
   })().finally(() => pastaPromises.delete(v.id));
   pastaPromises.set(v.id, p);
   return p;
+}
+/* Grava a vistoria mesmo quando ela não é mais a aberta na tela (uma sincronização que terminou depois de sair dela). */
+function persistirVistoria(v) {
+  if (!v) return;
+  if (S.v === v) { markDirty(); return; }
+  if (!S.db || v._novo) return;
+  v.atualizadoEm = Date.now();
+  S.db.doc('vistorias/' + v.id).set(clone(v)).catch(() => {});
 }
 /* Envio ao Drive em dois jeitos: o arquivo anexado à chamada (quando a tela permite) e o conteúdo em texto.
    Se um falhar, o outro é tentado; o jeito que funcionou fica valendo para as próximas fotos. */
@@ -724,18 +769,23 @@ function detalheErro(e) {
   const msg = String(e.message || '').replace(/\s+/g, ' ').slice(0, 220);
   return `${e.code || 'erro'}${e.modo ? ' (' + e.modo + ')' : ''}${msg ? ': ' + msg : ''}`;
 }
+/* Tamanhos que o app tenta ao enviar uma foto: começa no maior e desce até caber no canal com o Drive.
+   O tamanho que funcionou fica guardado na vistoria e vale para as próximas fotos. */
+const RENDICOES = [[1600, 0.8, 480000], [1280, 0.76, 360000], [1000, 0.72, 240000], [800, 0.66, 160000]];
+function registrarDrive(v, entrada) {
+  v.driveLog = (v.driveLog || []).slice(-19);
+  v.driveLog.push({ em: Date.now(), ...entrada });
+}
+function ultimoErroDrive(v) {
+  const l = (v.driveLog || []).filter((x) => x.code);
+  return l.length ? l[l.length - 1] : null;
+}
 async function enviarComo(modo, blob, title, mime, parentId, nomeArquivo) {
   const input = { title, parentId, contentMimeType: mime, disableConversionToGoogleType: true };
   if (modo === 'arquivo') input.base64Content = { $file: { data: blob, name: nomeArquivo, type: mime } };
   else {
-    let b64 = await paraBase64(blob);
-    if (b64.length > 980000 && mime === 'image/jpeg') {
-      for (const [lado, q] of [[1400, 0.75], [1200, 0.7], [1000, 0.65]]) {
-        b64 = await paraBase64((await reduzir(blob, lado, q)).blob);
-        if (b64.length <= 980000) break;
-      }
-    }
-    if (b64.length > 980000) throw { code: 'grande' };
+    const b64 = await paraBase64(blob);
+    if (b64.length > 720000) throw { code: 'grande' };
     input.base64Content = b64;
   }
   const f = arquivoDe(await drive('create_file', input));
@@ -753,33 +803,223 @@ async function enviarArquivo(blob, title, mime, parentId, nomeArquivo) {
       return f;
     } catch (e) {
       ultimo = (e && typeof e === 'object') ? { ...e, modo } : { code: 'erro', message: String(e), modo };
+      // O jeito "arquivo" pode não existir nesta tela: cai para o texto e não tenta mais o arquivo nesta sessão.
+      if (modo === 'arquivo' && ['capability_disabled', 'bad_request', 'transform_error', 'capability_removed'].includes(ultimo.code)) { S.fileArgs = false; S.modoEnvio = 'texto'; continue; }
       if (ERROS_SEM_SEGUNDA_TENTATIVA.has(ultimo.code)) break;
     }
   }
   throw ultimo;
 }
+/* Confere no Drive que o arquivo existe. Devolve false só quando o Drive diz que ele não existe;
+   resposta sem tamanho conta como existente, e erro de conexão continua como erro, para a próxima rodada. */
+async function conferirArquivoDrive(id) {
+  let p;
+  try { p = await drive('get_file_metadata', { fileId: id, excludeContentSnippets: true }); }
+  catch (e) {
+    const txt = String((e && e.message) || '') + ' ' + (e && e.result ? JSON.stringify(e.result).slice(0, 300) : '');
+    if (e && e.code === 'tool_error' && /not found|404|does not exist|notFound/i.test(txt)) return false;
+    throw e;
+  }
+  const f = arquivoDe(p);
+  if (!f || f.trashed) return false;
+  const tam = f.fileSize !== undefined ? +f.fileSize : (f.size !== undefined ? +f.size : null);
+  return !(tam === 0 && /^image\//.test(String(f.mimeType || '')));
+}
+/* Envia uma foto ao Drive descendo de tamanho até dar certo, e confere o arquivo no fim.
+   Numa segunda tentativa, procura antes se a foto já está na pasta (o envio anterior pode ter dado certo sem resposta). */
+async function enviarFotoDrive(v, f, pastaImagens) {
+  const original = await pegarBlob(f.asset);
+  if (f.driveTentou) {
+    const ja = await acharNoDrive(f.code + '.jpg', pastaImagens);
+    if (ja) { f.drive = ja.id; f.driveOk = true; registrarDrive(v, { foto: f.code, ok: true, reaproveitada: true }); return ja; }
+  }
+  f.driveTentou = true;
+  let idx = Math.min(v.driveRendicao || 0, RENDICOES.length - 1);
+  let ultimo = null;
+  for (; idx < RENDICOES.length; idx++) {
+    const [lado, q, cap] = RENDICOES[idx];
+    let blob = original;
+    if (idx > 0 || original.size * 1.37 > cap) {
+      try { blob = (await reduzir(original, lado, q)).blob; } catch (e) { ultimo = { code: 'decode', message: 'não consegui reduzir a foto' }; continue; }
+    }
+    if (blob.size * 1.37 > cap && idx < RENDICOES.length - 1) continue;
+    try {
+      const arq = await enviarArquivo(blob, f.code + '.jpg', 'image/jpeg', pastaImagens, f.code + '.jpg');
+      f.drive = arq.id; f.driveTam = blob.size; f.driveRend = idx; f.driveOk = false;
+      if (idx !== (v.driveRendicao || 0)) v.driveRendicao = idx;
+      let conf = null;
+      try { conf = await conferirArquivoDrive(arq.id); } catch (_) { conf = null; }
+      if (conf === false) { f.drive = ''; registrarDrive(v, { foto: f.code, code: 'nao_confirmado', msg: 'o Drive aceitou a foto, mas ela não aparece na pasta', tamanho: blob.size, rend: idx }); throw { code: 'nao_confirmado', message: 'enviada, mas não apareceu na pasta do Drive' }; }
+      f.driveOk = conf === true;
+      registrarDrive(v, { foto: f.code, ok: true, tamanho: blob.size, modo: S.modoEnvio, rend: idx, conferida: f.driveOk });
+      return arq;
+    } catch (e) {
+      ultimo = e;
+      if (e && e.code === 'nao_confirmado') throw e;
+      registrarDrive(v, { foto: f.code, code: (e && e.code) || 'erro', modo: e && e.modo, msg: String((e && e.message) || '').slice(0, 200), tamanho: blob.size, rend: idx });
+      if (e && (FATAIS_DRIVE.has(e.code) || ERROS_SEM_SEGUNDA_TENTATIVA.has(e.code))) throw e;
+      if (e && (e.code === 'server_unavailable' || e.code === 'rate_limited' || (e.code === 'upstream_error' && e.retryable))) { e.passageiro = true; throw e; }
+    }
+  }
+  throw ultimo || { code: 'erro', message: 'não consegui enviar a foto' };
+}
+function fotosPendentesDrive(v) { return (v.fotos || []).filter((f) => !f.pendente && !f.drive && !f.perdida && !String(f.asset).startsWith('local-')); }
+function fotosPerdidas(v) { return (v.fotos || []).filter((f) => !f.pendente && !f.drive && (f.perdida || String(f.asset).startsWith('local-'))); }
+function fotosSemConferencia(v) { return (v.fotos || []).filter((f) => !f.pendente && f.drive && !f.driveOk); }
+/* Sincroniza com o Drive: envia o que falta, confere o que ainda não foi conferido, e sobe o PDF se ele ficou para trás. */
+async function sincronizarDrive(v, opts) {
+  opts = opts || {};
+  const alvo = opts.fotos || fotosPendentesDrive(v);
+  const r = { ok: 0, total: alvo.length, erro: null, conferidas: 0, fatal: false };
+  const ehFatal = (e) => !!(e && (FATAIS_DRIVE.has(e.code) || ERROS_SEM_SEGUNDA_TENTATIVA.has(e.code)));
+  const parou = () => !!(opts.signal && opts.signal.aborted);
+  if (!S.mcp) { r.erro = { code: 'sem_mcp' }; r.fatal = true; return r; }
+  let d;
+  try { d = await garantirPastas(v); } catch (e) { r.erro = e; r.fatal = ehFatal(e); registrarDrive(v, { code: (e && e.code) || 'erro', msg: String((e && e.message) || '').slice(0, 200), etapa: 'pasta' }); persistirVistoria(v); return r; }
+  for (const f of alvo) {
+    if (parou()) break;
+    if (!f.drive) {
+      try { await enviarFotoDrive(v, f, d.imagens); }
+      catch (e) {
+        r.erro = e;
+        if (e && e.code === 'sumiu_app') { f.perdida = true; r.total--; registrarDrive(v, { foto: f.code, code: 'sumiu_app', msg: 'a foto não está mais neste aparelho' }); persistirVistoria(v); continue; }
+        persistirVistoria(v);
+        if (ehFatal(e)) { r.fatal = true; break; }
+        if (e && e.passageiro) { r.passageiro = true; break; }
+        opts.aoAvancar && opts.aoAvancar(r);
+        continue;
+      }
+      persistirVistoria(v);
+    }
+    r.ok++;
+    opts.aoAvancar && opts.aoAvancar(r);
+  }
+  if (!opts.fotos && !r.erro && !parou()) {
+    for (const f of fotosSemConferencia(v)) {
+      if (parou()) break;
+      try {
+        const ok = await conferirArquivoDrive(f.drive);
+        if (ok) { f.driveOk = true; r.conferidas++; }
+        else { f.drive = ''; f.driveOk = false; registrarDrive(v, { foto: f.code, code: 'sumiu', msg: 'a foto não está mais na pasta do Drive; vai ser enviada de novo' }); r.total++; }
+        persistirVistoria(v);
+      } catch (e) { r.erro = e; break; }
+    }
+    if (!r.erro && !parou() && v.status === 'concluida' && v.drive && v.drive.pdfPendente && !v.drive.pdfGrande) {
+      try {
+        let pdf = S.pdf && S.pdf.vid === v.id ? S.pdf : null;
+        if (!pdf) { const blob = await gerarPDF(v); pdf = S.pdf = { vid: v.id, blob, nome: v.drive.pdfNome || nomePDF(v) }; }
+        const f = await enviarArquivo(pdf.blob, pdf.nome, 'application/pdf', v.drive.pasta, 'laudo-vistoria.pdf');
+        v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = pdf.nome; v.drive.pdfPendente = false;
+        v.pdfVersao = (v.pdfVersao || 0) + 1;
+        if (S.v === v) S.laudoAviso = '';
+        registrarDrive(v, { ok: true, etapa: 'pdf' });
+        persistirVistoria(v);
+      } catch (e) {
+        registrarDrive(v, { code: (e && e.code) || 'erro', msg: String((e && e.message) || '').slice(0, 200), etapa: 'pdf' });
+        if (e && e.code === 'grande') { v.drive.pdfGrande = true; persistirVistoria(v); }
+      }
+    }
+  }
+  return r;
+}
+function pdfPendente(v) { return !!(v && v.status === 'concluida' && v.drive && v.drive.pdfPendente && !v.drive.pdfGrande); }
+function syncPendente(v) {
+  return !!v && (fotosPendentesDrive(v).length > 0 || fotosSemConferencia(v).length > 0 || pdfPendente(v));
+}
+const SYNC_ESPERAS = [15000, 30000, 60000, 120000, 180000];
+const SYNC_MAX = 10;
+function pararSync() {
+  const y = S.sync;
+  clearTimeout(y.timer); y.timer = null; y.proximo = 0;
+  if (y.ctl) { try { y.ctl.abort(); } catch (_) {} }
+}
+function agendarSync(v, atraso) {
+  const y = S.sync;
+  clearTimeout(y.timer); y.timer = null;
+  if (!v || !S.mcp || S.v !== v || !syncPendente(v)) { y.proximo = 0; return; }
+  if (y.vid !== v.id) { y.vid = v.id; y.tentativas = 0; }
+  if (y.tentativas >= SYNC_MAX) { y.proximo = 0; desenharDrive(); return; }
+  const ms = atraso !== undefined ? atraso : SYNC_ESPERAS[Math.min(y.tentativas, SYNC_ESPERAS.length - 1)];
+  y.proximo = Date.now() + ms;
+  y.timer = setTimeout(() => rodarSync(v), ms);
+  desenharDrive();
+}
+async function rodarSync(v, manual) {
+  const y = S.sync;
+  if (!v || S.v !== v) return;
+  if (y.rodando) { if (manual) toast('Já estou sincronizando com o Drive.'); return; }
+  if (S.busy || (document.visibilityState === 'hidden' && !manual)) { y.tentativas++; agendarSync(v, 20000); return; }
+  if (!syncPendente(v)) { y.proximo = 0; desenharDrive(); return; }
+  y.rodando = true; y.proximo = 0;
+  if (manual) y.tentativas = 0;
+  y.ctl = new AbortController();
+  desenharDrive();
+  y.p = sincronizarDrive(v, { signal: y.ctl.signal });
+  let r;
+  try { r = await y.p; } finally { y.rodando = false; y.p = null; }
+  if (S.v !== v) return;
+  y.tentativas++;
+  if (r.fatal) y.tentativas = SYNC_MAX;
+  await flush();
+  if (syncPendente(v)) agendarSync(v); else { y.tentativas = 0; y.proximo = 0; }
+  desenharDrive();
+  if (manual) toast(syncPendente(v) ? `${r.ok} de ${r.total} fotos enviadas. ${r.erro ? erroDrive(r.erro) : ''}` : 'Tudo sincronizado com o Drive.');
+}
+async function esperarSync() { if (S.sync.p) { try { await S.sync.p; } catch (_) {} } }
+async function conferirDriveTudo() {
+  const v = S.v;
+  if (!v || S.busy || !S.mcp) return;
+  pararSync(); await esperarSync();
+  if (S.v !== v) return;
+  v.fotos.forEach((f) => { if (f.drive && !f.pendente) f.driveOk = false; });
+  S.busy = { vid: v.id, titulo: 'Conferindo o Drive', podeParar: false, passos: [{ k: 'conf', txt: 'Revisor do Drive: conferindo cada foto na pasta Imagens', st: 'run', det: `0 de ${v.fotos.filter((f) => !f.pendente).length}` }] };
+  render();
+  let n = 0;
+  for (const f of v.fotos.filter((x) => !x.pendente && x.drive)) {
+    try { const ok = await conferirArquivoDrive(f.drive); if (ok) f.driveOk = true; else { f.drive = ''; registrarDrive(v, { foto: f.code, code: 'sumiu', msg: 'a foto não está na pasta do Drive' }); } }
+    catch (e) { registrarDrive(v, { foto: f.code, code: (e && e.code) || 'erro', msg: String((e && e.message) || '').slice(0, 200), etapa: 'conferencia' }); toast('A conferência parou: ' + erroDrive(e)); break; }
+    setPasso('conf', 'run', `${++n} de ${v.fotos.filter((x) => !x.pendente).length}`);
+  }
+  const faltam = fotosPendentesDrive(v).length;
+  setPasso('conf', faltam ? 'err' : 'ok', faltam ? plural(faltam, 'foto precisa ser enviada de novo', 'fotos precisam ser enviadas de novo') : 'todas as fotos estão na pasta Imagens');
+  markDirty(); await flush();
+  S.busy = null;
+  render();
+  if (faltam) rodarSync(v, true);
+}
 async function reenviarFotos() {
   const v = S.v;
   if (!v || S.busy) return;
-  const faltam = v.fotos.filter((f) => !f.drive && !f.pendente);
-  if (!faltam.length) { toast('Todas as fotos já estão no Drive.'); return; }
-  S.busy = { vid: v.id, titulo: 'Reenviando as fotos ao Drive', podeParar: false, passos: [{ k: 'fotos', txt: 'Enviando as fotos que faltavam para a pasta Imagens', st: 'run', det: `0 de ${faltam.length}` }] };
-  render();
-  const r = await enviarFotosDrive(v, faltam, (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`));
-  markDirty();
-  await flush();
-  S.busy = null;
-  S.avisoFotos = r.erro && r.ok < r.total ? { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) } : null;
-  render();
-  toast(r.ok === r.total ? 'Todas as fotos foram para o Drive.' : `${r.ok} de ${r.total} fotos enviadas.`);
+  if (!syncPendente(v)) { toast(fotosPerdidas(v).length ? 'As fotos que faltam se perderam no aparelho onde foram tiradas; as outras já estão no Drive.' : 'Todas as fotos já estão no Drive.'); return; }
+  return rodarSync(v, true);
+}
+function desenharDrive() {
+  const v = S.v;
+  if (!v) return;
+  document.querySelectorAll('[data-drive-status]').forEach((el) => { el.outerHTML = viewFotosDrive(v); });
 }
 function viewFotosDrive(v) {
-  const total = v.fotos.filter((f) => !f.pendente).length;
-  if (!total) return '';
-  const no = v.fotos.filter((f) => f.drive && !f.pendente).length;
-  const av = S.avisoFotos && S.avisoFotos.vid === v.id ? S.avisoFotos : null;
-  if (no >= total && !av) return `<p class="hint">Fotos na pasta Imagens do Drive: ${no} de ${total}.</p>`;
-  return `<div class="msg ${no >= total ? 'ok' : 'warn'}"><p>Fotos na pasta Imagens do Drive: ${no} de ${total}.${no < total ? ' As que faltam continuam guardadas no app.' : ''}</p>${av ? `<p>${esc(av.texto)}</p><p class="hint">Detalhe técnico, para mandar ao suporte: ${esc(av.detalhe)}</p>` : ''}${no < total ? '<div class="row"><button class="btn sm" data-act="reenviar-fotos">Reenviar fotos ao Drive</button></div>' : ''}</div>`;
+  const todas = v.fotos.filter((f) => !f.pendente);
+  const total = todas.length;
+  if (!total) return '<div data-drive-status hidden></div>';
+  const no = todas.filter((f) => f.drive).length;
+  const conf = todas.filter((f) => f.drive && f.driveOk).length;
+  const faltam = total - no;
+  const y = S.sync, ue = ultimoErroDrive(v);
+  const pdfFalta = pdfPendente(v);
+  const perdidas = fotosPerdidas(v).length;
+  const linha = `Drive: ${no} de ${total} fotos na pasta Imagens${conf < no ? `, ${conf} conferidas` : no ? ', todas conferidas' : ''}${pdfFalta ? '. PDF ainda não enviado' : ''}${v.drive && v.drive.pdfGrande ? '. O PDF ficou grande demais para o canal com o Drive: baixe e coloque na pasta' : ''}${perdidas ? `. ${perdidas === 1 ? 'Uma foto se perdeu' : perdidas + ' fotos se perderam'} no aparelho onde foi tirada e não entra no Drive` : ''}.`;
+  if (!faltam && !pdfFalta && !y.rodando) return `<div class="row" data-drive-status><p class="hint">${esc(linha)}</p><button class="btn ghost sm" data-act="conferir-drive">Conferir o Drive</button></div>`;
+  const faltamDeVerdade = faltam - perdidas;
+  if (!faltamDeVerdade && !pdfFalta && !y.rodando) return `<div class="msg warn" data-drive-status><p>${esc(linha)}</p></div>`;
+  let estado = '';
+  if (y.rodando && y.vid === v.id) estado = '<span class="spin"></span> Sincronizando com o Drive';
+  else if (y.proximo && y.vid === v.id) estado = `Tento de novo sozinho em ${Math.max(1, Math.round((y.proximo - Date.now()) / 1000))} s.`;
+  else if (faltam) estado = ue && (FATAIS_DRIVE.has(ue.code) || ERROS_SEM_SEGUNDA_TENTATIVA.has(ue.code)) ? 'Isso precisa ser resolvido antes: siga a orientação abaixo e toque em Sincronizar agora.' : 'Parei de tentar sozinho. Toque em Sincronizar agora quando a conexão voltar.';
+  return `<div class="msg ${faltam || pdfFalta ? 'warn' : 'ok'}" data-drive-status><p>${esc(linha)}${faltam ? (faltam === 1 ? ' Uma foto continua guardada só no app.' : ` ${faltam} fotos continuam guardadas só no app.`) : ''}</p>
+    ${estado ? `<p class="hint">${estado}</p>` : ''}
+    ${ue ? `<p>Último erro: ${esc(erroDrive({ code: ue.code, message: ue.msg }))}</p><p class="hint">Detalhe técnico, para mandar ao suporte: ${esc(`${ue.code}${ue.modo ? ' (' + ue.modo + ')' : ''}${ue.foto ? ' em ' + ue.foto : ''}${ue.tamanho ? ', ' + tamanho(ue.tamanho) : ''}${ue.msg ? ': ' + ue.msg : ''}`)}</p>` : ''}
+    <div class="row"><button class="btn sm" data-act="reenviar-fotos" ${y.rodando ? 'disabled' : ''}>Sincronizar agora</button><button class="btn ghost sm" data-act="conferir-drive" ${y.rodando ? 'disabled' : ''}>Conferir o Drive</button></div></div>`;
 }
 /* Cópia de segurança: os dados completos da vistoria vão para a subpasta Dados, num arquivo novo a cada lote e a cada laudo. */
 async function salvarCopia(v, rotulo) {
@@ -818,29 +1058,7 @@ async function baixarPlanilha() {
   catch (e) { if (e && e.code !== 'declined') toast('Não consegui baixar a planilha' + (e.code ? ` (${e.code})` : '') + '.'); }
 }
 async function enviarFotosDrive(v, fotos, aoAvancar, signal) {
-  const r = { ok: 0, total: fotos.length, erro: null };
-  if (!fotos.length) return r;
-  let d;
-  try { d = await garantirPastas(v); } catch (e) { r.erro = e; return r; }
-  for (const f of fotos) {
-    if (signal && signal.aborted) break;
-    if (!f.drive) {
-      try {
-        const blob = await pegarBlob(f.asset);
-        const arq = await enviarArquivo(blob, f.code + '.jpg', 'image/jpeg', d.imagens, f.code + '.jpg');
-        f.drive = arq.id;
-        markDirty();
-      } catch (e) {
-        r.erro = e;
-        if (e && FATAIS_DRIVE.has(e.code)) break;
-        aoAvancar && aoAvancar(r);
-        continue;
-      }
-    }
-    r.ok++;
-    aoAvancar && aoAvancar(r);
-  }
-  return r;
+  return sincronizarDrive(v, { fotos, aoAvancar, signal });
 }
 
 /* ---------- Claude ---------- */
@@ -855,7 +1073,12 @@ function relatorioJSON(lista, comFotos) {
     }),
   })));
 }
-function entradaDe(v) { return v && v.entradaId ? S.lista.find((x) => x.id === v.entradaId) || null : null; }
+function entradaDe(v) { return v && v.entradaId ? S.lista.find((x) => x.id === v.entradaId) || S.entradasExtra[v.entradaId] || null : null; }
+async function carregarEntrada(id) {
+  if (!S.db || S.entradasExtra[id] !== undefined) return;
+  S.entradasExtra[id] = null;
+  try { const d = await S.db.doc('vistorias/' + id).get(); if (d.exists) { S.entradasExtra[id] = d.data(); if (S.v && S.v.entradaId === id) render(); } } catch (_) {}
+}
 function cabecalhoPrompt(v) {
   return [
     `Você organiza laudos de vistoria de imóveis para ${S.cfg.empresa ? 'a ' + S.cfg.empresa : 'uma imobiliária'}${S.cfg.cidade ? ' (' + S.cfg.cidade + ')' : ''}.`,
@@ -909,7 +1132,8 @@ function aplicarResultado(work, r, codesDoLote, todos, opts) {
       if (!inome) continue;
       let it = c.itens.find((x) => norm(x.nome) === norm(inome));
       const novo = !it;
-      if (!it) { it = { id: uid(), nome: inome, estado: '', descricao: '', fotos: [], critico: false }; c.itens.push(it); }
+      if (!it) { it = { id: uid(), nome: inome, estado: '', descricao: '', fotos: [], critico: false, lotes: [] }; c.itens.push(it); }
+      if (opts && opts.lote) { it.lotes = it.lotes || []; if (!it.lotes.includes(opts.lote)) it.lotes.push(opts.lote); }
       // Campos que a pessoa mudou à mão não são trocados pelo Claude, a não ser que ela peça (correção falada citando o item).
       const liberado = !!(opts && opts.liberar && opts.liberar(it, c));
       const man = it.manual && !liberado ? it.manual : {};
@@ -937,8 +1161,8 @@ function semRepetir(m) {
   for (const x of m) mapa.set(norm(x.comodo) + '|' + norm(x.item), x);
   return [...mapa.values()];
 }
-async function organizarLote(v, n, fotos, texto, signal, aoParte) {
-  const work = { comodos: clone(v.comodos), fotosSoltas: [...(v.fotosSoltas || [])] };
+async function organizarLote(v, n, fotos, texto, signal, aoParte, base) {
+  const work = { comodos: clone(base ? base.comodos : v.comodos), fotosSoltas: [...((base || v).fotosSoltas || [])] };
   const todos = new Set(v.fotos.map((f) => f.code));
   const comImagens = S.imgMax > 0 && fotos.length > 0;
   const grupos = [];
@@ -953,7 +1177,7 @@ async function organizarLote(v, n, fotos, texto, signal, aoParte) {
     if (comImagens) opts.images = await Promise.all(g.map((f) => pegarBlob(f.asset)));
     const r = await S.sample.json(prompt, opts);
     if (!r || typeof r !== 'object' || !Array.isArray(r.comodos)) throw { code: 'invalid_json' };
-    out.mudancas.push(...aplicarResultado(work, r, g.map((f) => f.code), todos));
+    out.mudancas.push(...aplicarResultado(work, r, g.map((f) => f.code), todos, { lote: n }));
     if (r.resumo) out.resumos.push(String(r.resumo).trim());
     if (Array.isArray(r.duvidas)) out.duvidas.push(...r.duvidas.map(String).map((s) => s.trim()).filter(Boolean));
   }
@@ -962,7 +1186,7 @@ async function organizarLote(v, n, fotos, texto, signal, aoParte) {
 function guardarSemClaude(v, n, texto, codes) {
   let c = v.comodos.find((x) => norm(x.nome) === 'a organizar');
   if (!c) { c = { id: uid(), nome: 'A organizar', itens: [], observacoes: '' }; v.comodos.push(c); }
-  const it = { id: uid(), nome: `Lote ${n}`, estado: '', descricao: texto, fotos: codes.slice(), critico: false };
+  const it = { id: uid(), nome: `Lote ${n}`, estado: '', descricao: texto, fotos: codes.slice(), critico: false, lotes: [n] };
   c.itens.push(it);
   v.fotosSoltas = (v.fotosSoltas || []).filter((f) => !codes.includes(f));
   return [{ comodo: c.nome, item: it.nome, estado: '', critico: false, novo: true }];
@@ -989,6 +1213,8 @@ async function compararComEntrada(v, e, signal) {
     'Valores de "entrada" e "saida": "novo", "bom", "regular", "ruim", "nao_se_aplica" ou "" quando o item não existe naquela vistoria.');
   const r = await S.sample.json(linhas.join('\n'), { signal, modelTier: 'default' });
   if (!r || !Array.isArray(r.itens)) throw { code: 'invalid_json' };
+  const manuais = {};
+  ((v.comparacao && v.comparacao.itens) || []).forEach((x) => { if (x.manual) manuais[norm(x.comodo) + '|' + norm(x.item)] = x; });
   v.comparacao = {
     em: Date.now(), entradaId: e.id, desatualizada: false,
     resumo: String(r.resumo || '').trim(),
@@ -1001,7 +1227,7 @@ async function compararComEntrada(v, e, signal) {
       situacao: SIT_OK.has(x.situacao) ? x.situacao : 'avaliar',
       explicacao: String(x.explicacao || '').trim(),
       sugestao: String(x.sugestao || '').trim(),
-    })),
+    })).map((x) => { const m = manuais[norm(x.comodo) + '|' + norm(x.item)]; return m ? { ...x, situacao: m.situacao, explicacao: m.explicacao, manual: true } : x; }),
   };
 }
 async function escreverParecer(v, signal) {
@@ -1018,7 +1244,7 @@ async function escreverParecer(v, signal) {
   if (v.observacoesGerais) linhas.push('', 'Observações gerais do vistoriador:', v.observacoesGerais);
   const { text } = await S.sample(linhas.join('\n'), { signal, modelTier: 'default' });
   v.parecer = String(text || '').trim().replace(/^["“]+|["”]+$/g, '').replace(/\s*[—–]\s*/g, ', ');
-  v.parecerDesatualizado = false;
+  v.parecerDesatualizado = false; v.parecerManual = false;
 }
 
 /* ---------- ações principais ---------- */
@@ -1041,6 +1267,7 @@ async function criar() {
   if (!S.db) { setMsg('dados', 'Este app só guarda vistorias quando aberto pelo claude.ai, com a sua conta logada.', 'bad'); return; }
   delete v._novo;
   v.criadoPor = S.meuId || null;
+  pararSync(); S.sync.vid = v.id; S.sync.tentativas = 0;
   v.fase = 'lotes'; S.aba = 'lotes'; S.msg = null;
   S.criandoPasta = true;
   render();
@@ -1091,13 +1318,18 @@ async function processarLote() {
   const pDrive = enviarFotosDrive(v, fotos, (r) => setPasso('drive', 'run', `${r.ok} de ${r.total}`), ctl.signal).then((r) => {
     const falhou = r.erro && r.ok < r.total;
     setPasso('drive', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)}` : `${r.ok} de ${r.total} na pasta Imagens`);
-    if (falhou) { S.avisos['drive-' + v.id] = erroDrive(r.erro); S.avisoFotos = { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) }; }
+    if (falhou) S.avisos['drive-' + v.id] = erroDrive(r.erro);
     return r;
   });
   let org = null, erro = null;
+  const antesDaEdicao = !!v.loteAtual.editando;
+  const ordemComodos = v.comodos.map((c) => norm(c.nome));
+  // Na edição, o Claude recebe o relatório sem o lote, mas a vistoria só muda depois que ele responder.
+  let base = null;
+  if (antesDaEdicao) { base = clone({ comodos: v.comodos, fotosSoltas: v.fotosSoltas || [], lotes: v.lotes, fotos: v.fotos }); desfazerLote(base, n); }
   if (S.sample) {
     try {
-      org = await organizarLote(v, n, fotos, texto, ctl.signal, (i, t) => { if (t > 1) setPasso('claude', 'run', `parte ${i} de ${t}`); });
+      org = await organizarLote(v, n, fotos, texto, ctl.signal, (i, t) => { if (t > 1) setPasso('claude', 'run', `parte ${i} de ${t}`); }, base);
       setPasso('claude', 'ok', '');
     } catch (e) { erro = e; setPasso('claude', 'err', erroClaude(e)); }
   }
@@ -1111,16 +1343,24 @@ async function processarLote() {
   }
   const codes = fotos.map((f) => f.code);
   let mudancas;
+  if (antesDaEdicao) desfazerLote(v, n);
+  if (v.status === 'concluida') { v.status = 'andamento'; v.fase = 'lotes'; }
   if (org) { v.comodos = org.comodos; v.fotosSoltas = org.fotosSoltas; mudancas = org.mudancas; }
   else mudancas = guardarSemClaude(v, n, texto, codes);
+  fotos.forEach((f) => { delete f.fixo; });
+  if (antesDaEdicao) {
+    const pos = (c) => { const i = ordemComodos.indexOf(norm(c.nome)); return i < 0 ? 999 : i; };
+    v.comodos.sort((a, b) => pos(a) - pos(b));
+  }
   fotos.forEach((f) => { delete f.pendente; });
   const lote = {
-    n, texto, fotos: codes, em: Date.now(),
+    n, texto: texto.slice(0, 6000), fotos: codes, em: Date.now(),
     resumo: org ? org.resumos.join(' ') : 'Lote guardado sem organização automática. Organize os itens na revisão.',
     duvidas: org ? org.duvidas.slice(0, 6) : [],
   };
   v.lotes.push(lote);
-  v.loteAtual = { n: n + 1, texto: '' };
+  v.lotes.sort((a, b) => a.n - b.n);
+  v.loteAtual = { n: proximoLote(v), texto: '' };
   if (v.comparacao) v.comparacao.desatualizada = true;
   if (v.parecer) v.parecerDesatualizado = true;
   markDirty();
@@ -1134,6 +1374,73 @@ async function processarLote() {
   S.busy = null;
   render();
   window.scrollTo(0, 0);
+  if (syncPendente(v)) { S.sync.vid = v.id; if (rDrive && rDrive.fatal) S.sync.tentativas = SYNC_MAX; agendarSync(v, 15000); }
+}
+/* Desfaz o que um lote colocou no relatório: tira as fotos dele dos itens e apaga os itens que só existiam por causa dele. */
+function desfazerLote(v, n) {
+  const lote = v.lotes.find((l) => l.n === n);
+  const codes = new Set([...(lote ? lote.fotos : []), ...v.fotos.filter((f) => f.lote === n).map((f) => f.code)]);
+  for (const c of v.comodos) {
+    c.itens = c.itens.filter((it) => {
+      it.fotos = (it.fotos || []).filter((code) => !codes.has(code));
+      if (!Array.isArray(it.lotes)) return true;
+      const tinha = it.lotes.includes(n);
+      it.lotes = it.lotes.filter((x) => x !== n);
+      return !tinha || it.lotes.length > 0 || !!it.manual || it.fotos.length > 0;
+    });
+  }
+  v.comodos = v.comodos.filter((c) => c.itens.length > 0 || String(c.observacoes || '').trim());
+  v.fotosSoltas = (v.fotosSoltas || []).filter((code) => !codes.has(code));
+  v.lotes = v.lotes.filter((l) => l.n !== n);
+  if (v.comparacao) v.comparacao.desatualizada = true;
+  if (v.parecer) v.parecerDesatualizado = true;
+  if (v.status === 'concluida') { v.status = 'andamento'; v.fase = 'lotes'; }
+}
+function editarLote(n) {
+  const v = S.v;
+  if (!v || S.busy) return;
+  const lote = v.lotes.find((l) => l.n === n);
+  if (!lote) return;
+  const pendAtual = v.fotos.filter((f) => f.pendente);
+  if (pendAtual.length || String(v.loteAtual.texto || '').trim()) { setMsg('lote', 'Termine ou cancele o lote que está aberto antes de editar outro.', 'warn'); return; }
+  v.fotos.forEach((f) => { if (f.lote === n) { f.pendente = true; f.fixo = true; } });
+  v.loteAtual = { n, texto: lote.texto, editando: true };
+  S.aba = 'lotes'; S.ultimo = null; S.pedirProximo = false; S.msg = null;
+  markDirty(); render();
+  const el = document.getElementById('lote-topo'); if (el) el.scrollIntoView({ block: 'start' });
+}
+function cancelarEdicaoLote() {
+  const v = S.v;
+  if (!v || !v.loteAtual.editando) return;
+  const n = v.loteAtual.n;
+  const novas = v.fotos.filter((f) => f.lote === n && !f.fixo);
+  v.fotos = v.fotos.filter((f) => !(f.lote === n && !f.fixo));
+  const existentes = new Set(v.fotos.filter((f) => f.lote === n).map((f) => f.code));
+  const prefixo = `L${pad(n)}-`;
+  const lote = v.lotes.find((l) => l.n === n);
+  if (lote) lote.fotos = lote.fotos.filter((code) => existentes.has(code));
+  v.comodos.forEach((c) => c.itens.forEach((it) => { it.fotos = (it.fotos || []).filter((code) => !code.startsWith(prefixo) || existentes.has(code)); }));
+  v.fotosSoltas = (v.fotosSoltas || []).filter((code) => !code.startsWith(prefixo) || existentes.has(code));
+  v.fotos.forEach((f) => { if (f.lote === n) { delete f.pendente; delete f.fixo; } });
+  v.loteAtual = { n: proximoLote(v), texto: '' };
+  S.msg = null;
+  markDirty(); render();
+  if (S.assets) novas.forEach((f) => { if (!String(f.asset).startsWith('local-')) S.assets.delete(f.asset).catch(() => {}); });
+}
+async function excluirLote(n) {
+  const v = S.v;
+  if (!v || S.busy) return;
+  const k = 'lote' + n;
+  if (S.confirmar !== k) { S.confirmar = k; render(); return; }
+  S.confirmar = null;
+  if (v.loteAtual.editando && v.loteAtual.n === n) v.loteAtual = { n: proximoLote(v), texto: '' };
+  desfazerLote(v, n);
+  const fotos = v.fotos.filter((f) => f.lote === n);
+  v.fotos = v.fotos.filter((f) => f.lote !== n);
+  markDirty(); render();
+  if (S.assets) for (const f of fotos) { if (!String(f.asset).startsWith('local-')) { try { await S.assets.delete(f.asset); } catch (_) {} } }
+  await flush();
+  toast(`Lote ${n} excluído. As fotos já enviadas continuam na pasta Imagens do Drive.`);
 }
 async function consolidar() {
   const v = S.v;
@@ -1144,7 +1451,7 @@ async function consolidar() {
   markDirty();
   const e = v.tipo === 'saida' ? entradaDe(v) : null;
   const fazComp = !!(e && (!v.comparacao || v.comparacao.desatualizada || v.comparacao.entradaId !== e.id));
-  const fazParecer = !String(v.parecer || '').trim() || !!v.parecerDesatualizado;
+  const fazParecer = !String(v.parecer || '').trim() || (!!v.parecerDesatualizado && !v.parecerManual);
   if (!S.sample || (!fazComp && !fazParecer)) { render(); window.scrollTo(0, 0); return; }
   const ctl = new AbortController();
   const passos = [];
@@ -1220,7 +1527,10 @@ async function corrigir() {
       else c.itens = c.itens.filter((i) => norm(i.nome) !== norm(rm.item));
     }
     const work = { comodos: v.comodos, fotosSoltas: v.fotosSoltas || [] };
-    aplicarResultado(work, r, [], new Set(v.fotos.map((f) => f.code)), { liberar: (it) => norm(instr).includes(norm(it.nome)) });
+    const instrN = norm(instr);
+    const repetidos = {};
+    v.comodos.forEach((c) => c.itens.forEach((i) => { repetidos[norm(i.nome)] = (repetidos[norm(i.nome)] || 0) + 1; }));
+    aplicarResultado(work, r, [], new Set(v.fotos.map((f) => f.code)), { liberar: (it, c) => instrN.includes(norm(it.nome)) && (repetidos[norm(it.nome)] <= 1 || !c || instrN.includes(norm(c.nome))) });
     const usados = new Set();
     v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((f) => usados.add(f))));
     v.fotosSoltas = [...new Set([...work.fotosSoltas, ...v.fotos.map((f) => f.code).filter((code) => !usados.has(code) && !v.fotos.find((f) => f.code === code).pendente)])];
@@ -1250,16 +1560,18 @@ function nomePDF(v) {
 async function finalizar() {
   const v = S.v;
   if (!v || S.busy) return;
+  pararSync(); await esperarSync();
+  if (S.v !== v || S.busy) return;
   if (!window.jspdf || !window.jspdf.jsPDF) { setMsg('aprovar', 'A parte que monta o PDF não carregou. Recarregue a página e tente de novo.', 'bad'); return; }
   await flush();
   v.fase = 'laudo'; S.aba = 'laudo'; S.laudoAviso = ''; S.laudoErro = '';
   markDirty();
   const faltam = v.fotos.filter((f) => !f.drive && !f.pendente);
   S.busy = {
-    vid: v.id, titulo: 'Gerando o laudo', podeParar: false,
+    vid: v.id, titulo: 'Gerando o laudo', podeParar: true, ctl: new AbortController(),
     passos: [
       { k: 'pastas', txt: 'Conferindo a pasta da vistoria no Drive', st: 'run', det: '' },
-      { k: 'fotos', txt: 'Enviando ao Drive as fotos que faltavam', st: faltam.length ? 'wait' : 'skip', det: faltam.length ? '' : 'todas já estão lá' },
+      { k: 'fotos', txt: 'Revisor do Drive: enviando e conferindo as fotos na pasta Imagens', st: 'wait', det: '' },
       { k: 'img', txt: 'Preparando as fotos do laudo', st: 'wait', det: '' },
       { k: 'pdf', txt: 'Montando o PDF', st: 'wait', det: '' },
       { k: 'conf', txt: 'Revisor de fidelidade: conferindo o PDF com o que foi preenchido', st: 'wait', det: '' },
@@ -1275,15 +1587,13 @@ async function finalizar() {
   let driveOk = true;
   try { await garantirPastas(v); setPasso('pastas', 'ok', v.drive.nome || ''); }
   catch (e) { driveOk = false; setPasso('pastas', 'err', erroDrive(e)); }
-  if (faltam.length) {
-    if (driveOk) {
-      setPasso('fotos', 'run');
-      const r = await enviarFotosDrive(v, faltam, (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`));
-      const falhou = r.erro && r.ok < r.total;
-      setPasso('fotos', falhou ? 'err' : 'ok', falhou ? `${r.ok} de ${r.total}. ${erroDrive(r.erro)} Detalhe: ${detalheErro(r.erro)}` : `${r.ok} de ${r.total}`);
-      if (falhou) S.avisoFotos = { vid: v.id, texto: erroDrive(r.erro), detalhe: detalheErro(r.erro) };
-    } else setPasso('fotos', 'skip', 'sem Drive');
-  }
+  if (driveOk) {
+    setPasso('fotos', 'run');
+    const r = await sincronizarDrive(v, { signal: S.busy && S.busy.ctl ? S.busy.ctl.signal : undefined, aoAvancar: (rr) => setPasso('fotos', 'run', `${rr.ok} de ${rr.total}`) });
+    if (S.busy && S.busy.ctl && S.busy.ctl.signal.aborted) { markDirty(); await flush(); S.busy = null; render(); return; }
+    const faltamAgora = fotosPendentesDrive(v).length;
+    setPasso('fotos', faltamAgora ? 'err' : 'ok', faltamAgora ? `${plural(faltamAgora, 'foto ficou', 'fotos ficaram')} só no app. ${r.erro ? erroDrive(r.erro) : ''}` : `${v.fotos.filter((f) => !f.pendente && f.drive).length} fotos na pasta, conferidas`);
+  } else setPasso('fotos', 'skip', 'sem Drive');
   let blob;
   try {
     blob = await gerarPDF(v, (k, det) => setPasso(k, 'run', det), (k) => setPasso(k, 'ok'));
@@ -1296,8 +1606,10 @@ async function finalizar() {
   const nome = nomePDF(v);
   S.pdf = { vid: v.id, blob, nome };
   let conf;
-  try { conf = await conferirPDF(v, blob, (k, det) => setPasso(k, 'run', det)); }
+  const sinalLaudo = S.busy && S.busy.ctl ? S.busy.ctl.signal : undefined;
+  try { conf = await conferirPDF(v, blob, (k, det) => setPasso(k, 'run', det), sinalLaudo); }
   catch (e) { conf = { fidelidade: [], mudancas: [], visual: [], visualRodou: false, visualErro: '', falhou: (e && e.message) || 'erro' }; }
+  if (sinalLaudo && sinalLaudo.aborted) { markDirty(); await flush(); S.busy = null; render(); toast('Geração do laudo interrompida. O PDF não foi salvo.'); return; }
   if (conf.falhou) setPasso('conf', 'skip', 'não rodou: ' + conf.falhou);
   else setPasso('conf', conf.fidelidade.length ? 'err' : 'ok', conf.fidelidade.length ? plural(conf.fidelidade.length, 'diferença encontrada', 'diferenças encontradas') : 'o PDF bate com o que foi preenchido');
   setPasso('visual', conf.visualRodou ? (conf.visual.length ? 'err' : 'ok') : 'skip', conf.visualRodou ? (conf.visual.length ? plural(conf.visual.length, 'ponto', 'pontos') : 'nenhum problema de aparência') : conf.visualErro || 'indisponível nesta tela');
@@ -1338,10 +1650,11 @@ async function excluirVistoria() {
   try { await S.db.doc('vistorias/' + v.id).delete(); }
   catch (e) { toast('Não consegui excluir a vistoria.'); return; }
   try { localStorage.removeItem('ve-rascunho-' + v.id); } catch (_) {}
-  if (S.assets) for (const f of v.fotos) { if (!String(f.asset).startsWith('local-')) { try { await S.assets.delete(f.asset); } catch (_) {} } }
-  S.v = null; S.tela = 'home'; S.confirmar = null;
+  clearTimeout(saveTimer); clearTimeout(retryTimer); pararSync();
+  S.v = null; S.tela = 'home'; S.confirmar = null; setSave('idle');
   render();
   toast('Vistoria excluída. A pasta no Drive continua lá.');
+  if (S.assets) for (const f of v.fotos) { if (!String(f.asset).startsWith('local-')) { try { await S.assets.delete(f.asset); } catch (_) {} } }
 }
 
 /* ---------- revisor do laudo ---------- */
@@ -1358,7 +1671,7 @@ function checagens(v) {
       if (String(i.descricao || '').trim().length < 12) p.push(`${c.nome}, ${i.nome}: a descrição está curta demais para um laudo.`);
     });
   });
-  if (v.tipo === 'saida' && entradaDe(v) && (!v.comparacao || v.comparacao.desatualizada)) p.push('A comparação com a vistoria de entrada está faltando ou desatualizada. Use "Comparar de novo".');
+  if (v.tipo === 'saida' && entradaDe(v) && (!v.comparacao || v.comparacao.desatualizada || v.comparacao.entradaId !== entradaDe(v).id)) p.push('A comparação com a vistoria de entrada está faltando ou desatualizada. Use "Comparar com a entrada" (ou "Comparar de novo").');
   if (!String(v.parecer || '').trim()) p.push('As considerações finais estão vazias.');
   if (v.fotos.some((f) => f.pendente)) p.push('Há fotos de um lote que ainda não foi processado.');
   return p;
@@ -1391,7 +1704,7 @@ async function revisorClaude(v, signal) {
       if (x.campo === 'comodo') atual = c ? c.nome : '';
       else if (it) atual = x.campo === 'estado' ? estadoLabel(it.estado) : x.campo === 'critico' ? (it.critico ? 'sim' : 'não') : String(it[x.campo] || '');
       const protegida = !!(it && it.manual && x.campo in it.manual);
-      return { comodo: String(x.comodo || ''), item: String(x.item || ''), campo: x.campo, valorNovo: String(x.valorNovo).trim(), motivo: String(x.motivo || ''), atual, protegida, valida: x.campo === 'comodo' ? !!c : !!it };
+      return { comodo: String(x.comodo || ''), item: String(x.item || ''), campo: x.campo, valorNovo: String(x.valorNovo).trim(), motivo: String(x.motivo || ''), atual, protegida, cid: c ? c.id : null, iid: it ? it.id : null, valida: x.campo === 'comodo' ? !!c : !!it };
     })
     .filter((x) => x.valida && !(x.campo === 'estado' && (!ESTADO_OK.has(x.valorNovo) || x.valorNovo === 'nao_se_aplica')));
   return { resumo: String(r.resumo || '').trim(), correcoes };
@@ -1424,8 +1737,8 @@ function aplicarRevisao(aplicar) {
   if (aplicar) {
     const ordem = r.correcoes.map((x, n) => ({ x, n })).filter((o) => r.marcadas[o.n]);
     for (const { x } of ordem.filter((o) => o.x.campo !== 'comodo')) {
-      const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
-      const it = c && c.itens.find((ii) => norm(ii.nome) === norm(x.item));
+      const c = v.comodos.find((cc) => cc.id === x.cid) || v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
+      const it = c && (c.itens.find((ii) => ii.id === x.iid) || c.itens.find((ii) => norm(ii.nome) === norm(x.item)));
       if (!it) continue;
       if (x.campo === 'estado') it.estado = x.valorNovo;
       else if (x.campo === 'critico') it.critico = /^(true|sim|1)$/i.test(x.valorNovo);
@@ -1433,7 +1746,7 @@ function aplicarRevisao(aplicar) {
       if (it.manual && x.campo in it.manual) it.manual[x.campo] = it[x.campo];
     }
     for (const { x } of ordem.filter((o) => o.x.campo === 'comodo')) {
-      const c = v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
+      const c = v.comodos.find((cc) => cc.id === x.cid) || v.comodos.find((cc) => norm(cc.nome) === norm(x.comodo));
       if (c) c.nome = x.valorNovo;
     }
     markDirty();
@@ -1483,7 +1796,7 @@ async function verificarConexoes() {
     catch (e) { add('Google Drive', false, erroDrive(e)); }
   }
   if (driveOk) {
-    if (!S.cfg.driveRaizId) add('Pasta das vistorias', false, S.souDono ? 'Ainda não criada. Toque em "Criar a pasta agora", aqui em Configurações.' : erroDrive({ code: 'sem_pasta_definida' }));
+    if (!S.cfg.driveRaizId) add('Pasta das vistorias', false, S.souDono ? (S.tela === 'inicio' ? 'Ainda não criada. Resolva o aviso acima e toque em "Concluir e verificar" de novo.' : 'Ainda não criada. Toque em "Criar a pasta agora", aqui em Configurações.') : erroDrive({ code: 'sem_pasta_definida' }));
     else { try { await garantirRaiz(); add('Pasta das vistorias', true, `Acessível: ${nomeRaiz()}.`); } catch (e) { add('Pasta das vistorias', false, erroDrive(e)); } }
   }
   add('Baixar arquivos', true, S.downloads ? 'Funcionando.' : 'Esta tela não deixa baixar arquivos. Não tem problema: os laudos vão para o Drive normalmente.');
@@ -1628,11 +1941,11 @@ async function trocarLogo(file) {
     if (tipo !== 'image/svg+xml') { try { prep = await prepararLogo(blob); } catch (_) { prep = null; } }
     const antigos = [S.cfg.logoAsset, S.cfg.logoAlternativa].filter(Boolean);
     const up = await S.assets.upload(blob, { type: tipo });
-    S.blobs.set(up.id, blob);
+    guardarBlob(up.id, blob);
     let usar = up.id, alternativa = '';
     if (prep && prep.limpa) {
       const upL = await S.assets.upload(prep.limpa, { type: 'image/png' });
-      S.blobs.set(upL.id, prep.limpa);
+      guardarBlob(upL.id, prep.limpa);
       usar = upL.id; alternativa = up.id;
     }
     S.cfg.logoAsset = usar; S.cfg.logoAlternativa = alternativa; S.cfg.logoSemFundo = !!alternativa; S.cfg.logoTratada = true;
@@ -1717,7 +2030,7 @@ function viewInicio() {
     <section class="hero">
       <p class="kicker"><span class="rule"></span>Primeira vez</p>
       <h1>Vamos deixar o app com a <em>cara da sua imobiliária</em></h1>
-      <p class="lede">Leva um minuto. Dá para mudar tudo depois, na engrenagem.</p>
+      <p class="lede">Leva um minuto. Dá para mudar tudo depois em Configurações: o botão de engrenagem no canto do topo da lista.</p>
     </section>
     <section class="card">
       <p class="kicker quiet"><span class="rule"></span>1 · Empresa</p>
@@ -1762,7 +2075,7 @@ async function concluirInicio() {
   S.msg = null; S.cfgOcupado = true; render();
   S.cfg.configurado = true;
   await salvarCfg(true);
-  if (S.mcp) { try { await garantirRaiz(); } catch (_) {} }
+  if (S.mcp) { try { await garantirRaiz(); } catch (e) { setMsg('inicio', 'Não consegui criar a pasta no Google Drive: ' + erroDrive(e) + ' Resolva isso e toque em "Concluir e verificar" de novo.', 'bad'); } }
   S.cfgOcupado = false;
   await verificarConexoes();
   render();
@@ -1805,7 +2118,7 @@ async function tratarLogoSalva() {
     const prep = await prepararLogo(blob);
     if (prep.limpa) {
       const up = await S.assets.upload(prep.limpa, { type: 'image/png' });
-      S.blobs.set(up.id, prep.limpa);
+      guardarBlob(up.id, prep.limpa);
       S.cfg.logoAlternativa = S.cfg.logoAsset; S.cfg.logoAsset = up.id; S.cfg.logoSemFundo = true;
     }
     if (!S.cfg.estiloCapa) S.cfg.estiloCapa = prep.estilo;
@@ -1868,13 +2181,16 @@ function conferirFidelidade(v, paginas) {
     for (const it of c.itens) {
       const nomeN = N(it.nome).slice(0, 40);
       let ii = -1;
-      for (let k = cursor; k < linhas.length; k++) { if (linhas[k] === N('Cômodo')) break; if (linhas[k].startsWith(nomeN) || (linhas[k].length >= 6 && nomeN.startsWith(linhas[k]))) { ii = k; break; } }
+      for (let k = cursor; k < linhas.length; k++) {
+        if (linhas[k] === N('Cômodo')) break;
+        const casa = linhas[k].startsWith(nomeN) || (linhas[k].length >= 6 && nomeN.startsWith(linhas[k]));
+        if (casa && rotulos.some((r) => linhas.slice(k + 1, k + 5).join('|').includes(r))) { ii = k; break; }
+      }
       if (ii < 0) { problemas.push(`${c.nome}, ${it.nome}: o item não aparece no PDF.`); continue; }
       const prox = linhas.slice(ii + 1, ii + 5).join('|');
       const achado = rotulos.filter((r) => prox.includes(r)).sort((a, b) => prox.indexOf(a) - prox.indexOf(b))[0] || '';
       const esperado = N(estadoLabel(it.estado));
       if (achado !== esperado) problemas.push(`${c.nome}, ${it.nome}: no app está "${estadoLabel(it.estado)}", mas o PDF mostra "${achado ? ESTADOS.concat([['', 'Sem estado']]).find((e) => N(e[1]) === achado)[1] : 'nenhum estado'}".`);
-      if (it.manual && 'estado' in it.manual && it.manual.estado !== it.estado) problemas.push(`${c.nome}, ${it.nome}: você marcou "${estadoLabel(it.manual.estado)}", mas o laudo ficou com "${estadoLabel(it.estado)}".`);
       for (const code of it.fotos) if (!tudo.includes(code)) problemas.push(`${c.nome}, ${it.nome}: a foto ${code} não aparece no PDF.`);
       cursor = ii + 1;
     }
@@ -1901,16 +2217,17 @@ async function revisorVisual(v, imagens, signal) {
   if (!r || !Array.isArray(r.problemas)) throw { code: 'invalid_json' };
   return r.problemas.filter((x) => x && x.descricao).slice(0, 12).map((x) => ({ pagina: +x.pagina || 0, tipo: String(x.tipo || 'outro'), descricao: String(x.descricao), sugestao: String(x.sugestao || '') }));
 }
-async function conferirPDF(v, blob, prog) {
+async function conferirPDF(v, blob, prog, signal) {
   const maxImg = S.sample && S.imgMax > 0 ? Math.min(3, S.imgMax) : 0;
   prog && prog('conf', 'lendo o texto do PDF');
   const lido = await lerPDF(blob, maxImg);
   const fidelidade = conferirFidelidade(v, lido.paginas);
+  if (S.pdfFotosFaltando) fidelidade.push(`${plural(S.pdfFotosFaltando, 'foto não entrou', 'fotos não entraram')} no laudo porque o app não conseguiu abri-la(s). Ela(s) aparece(m) como "Foto indisponível".`);
   const mudancas = mudancasDepoisDaAprovacao(v);
   let visual = [], visualRodou = false, visualErro = '';
   if (maxImg && lido.imagens.length) {
     prog && prog('visual', 'o Claude está olhando as páginas');
-    try { visual = await revisorVisual(v, lido.imagens); visualRodou = true; }
+    try { visual = await revisorVisual(v, lido.imagens, signal); visualRodou = true; }
     catch (e) { visualErro = erroClaude(e); }
   }
   return { fidelidade, mudancas, visual, visualRodou, visualErro, paginas: lido.total };
@@ -1951,16 +2268,18 @@ async function salvarLaudo(v, blob, nome, comPainel) {
     setPasso('up', 'run');
     try {
       const f = await enviarArquivo(blob, nome, 'application/pdf', v.drive.pasta, 'laudo-vistoria.pdf');
-      v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = nome;
+      v.drive.pdf = f.id; v.drive.pdfUrl = f.viewUrl || urlArquivo(f.id); v.drive.pdfNome = nome; v.drive.pdfPendente = false; v.drive.pdfGrande = false;
       v.pdfVersao = (v.pdfVersao || 0) + 1;
       setPasso('up', 'ok', '');
     } catch (e) {
+      v.drive.pdfPendente = true; v.drive.pdfNome = nome; if (e && e.code === 'grande') v.drive.pdfGrande = true;
       setPasso('up', 'err', erroDrive(e));
-      S.laudoAviso = 'O PDF ficou pronto, mas não foi para o Drive: ' + erroDrive(e) + ' Detalhe técnico: ' + detalheErro(e) + ' Baixe o arquivo e arraste para a pasta da vistoria.';
+      S.laudoAviso = 'O PDF ficou pronto, mas não foi para o Drive: ' + erroDrive(e) + ' Detalhe técnico: ' + detalheErro(e) + (S.downloads ? ' Baixe o arquivo e arraste para a pasta da vistoria, ou toque em Sincronizar agora quando o Drive voltar.' : ' Toque em Sincronizar agora quando o Drive voltar.');
     }
   } else {
+    if (v.drive) { v.drive.pdfPendente = true; v.drive.pdfNome = nome; }
     setPasso('up', 'skip', 'sem Drive');
-    S.laudoAviso = 'O PDF ficou pronto, mas o Google Drive não está disponível agora. Baixe o arquivo e guarde na pasta da vistoria.';
+    S.laudoAviso = 'O PDF ficou pronto, mas o Google Drive não está disponível agora.' + (S.downloads ? ' Baixe o arquivo e guarde na pasta da vistoria.' : ' Abra o app pelo claude.ai no computador para baixar, ou toque em Sincronizar agora quando o Drive voltar.');
   }
   v.status = 'concluida'; v.concluidaEm = Date.now();
   if (driveOk) {
@@ -1978,7 +2297,7 @@ async function salvarLaudo(v, blob, nome, comPainel) {
 function desfazerMudancasRevisor() {
   const v = S.v, k = S.conferencia;
   if (!v || !k) return;
-  for (const m of k.mudancas) {
+  for (const m of k.mudancas.filter((x) => x.campo === 'estado' || x.campo === 'critico')) {
     const it = v.comodos.flatMap((c) => c.itens).find((i) => i.id === m.id);
     if (it) { it[m.campo] = m.antes; if (it.manual && m.campo in it.manual) it.manual[m.campo] = m.antes; }
   }
@@ -2004,7 +2323,7 @@ async function logoPNG(blob) {
 
 /* ---------- PDF ---------- */
 function pdfTexto(s) {
-  return String(s ?? '')
+  return String(s ?? '').normalize('NFC')
     .replace(/[‘’‚′]/g, "'").replace(/[“”„″]/g, '"')
     .replace(/[–—−]/g, '-').replace(/…/g, '...').replace(/[•●▪‣]/g, '-')
     .replace(/[   ]/g, ' ').replace(/→/g, '>').replace(/×/g, 'x')
@@ -2050,8 +2369,8 @@ async function gerarPDF(v, progresso, pronto) {
     for (const ln of linhas) { espaco(l); doc.text(ln, o.x || M, y + l * 0.74); y += l; }
     y += o.depois === undefined ? 1.5 : o.depois;
   }
-  function secao(titulo, kicker) {
-    espaco(38);
+  function secao(titulo, kicker, reservar) {
+    espaco(20 + Math.min(70, reservar || 18));
     y += 5;
     doc.setDrawColor(...C.acento); doc.setLineWidth(0.6); doc.line(M, y, M + 9, y);
     if (kicker) { fonte('bold', 7.5, C.acento); doc.text(T(kicker.toUpperCase()), M + 12, y + 1, { charSpace: 0.4 }); }
@@ -2074,6 +2393,7 @@ async function gerarPDF(v, progresso, pronto) {
   v.comodos.forEach((c) => c.itens.forEach((i) => i.fotos.forEach((code) => { if (!usados.includes(code)) usados.push(code); })));
   (v.fotosSoltas || []).forEach((code) => { if (!usados.includes(code)) usados.push(code); });
   const imgs = new Map();
+  S.pdfFotosFaltando = 0;
   let k = 0;
   for (const code of usados) {
     const f = fotoPorCodigo(v, code);
@@ -2082,9 +2402,9 @@ async function gerarPDF(v, progresso, pronto) {
     if (!f) continue;
     try {
       const b = await pegarBlob(f.asset);
-      const r = await reduzir(b, 1100, 0.72);
+      const r = await reduzir(b, 900, 0.7);
       imgs.set(code, { data: await paraDataURL(r.blob), w: r.w, h: r.h });
-    } catch (_) {}
+    } catch (_) { S.pdfFotosFaltando = (S.pdfFotosFaltando || 0) + 1; }
   }
   let logo = null;
   if (cfg.logoAsset) {
@@ -2103,7 +2423,7 @@ async function gerarPDF(v, progresso, pronto) {
   progresso && progresso('pdf', '');
 
   function grade(codes) {
-    const cols = 2, gap = 6, cw = (CW - gap * (cols - 1)) / cols, ih = cw * 0.75, alt = ih + 10;
+    const cols = 2, gap = 6, cw = (CW - gap * (cols - 1)) / cols, ih = cw * 0.75, alt = ih + 14;
     for (let i = 0; i < codes.length; i += cols) {
       espaco(alt);
       for (let j = 0; j < cols && i + j < codes.length; j++) {
@@ -2118,7 +2438,7 @@ async function gerarPDF(v, progresso, pronto) {
         } else { fonte('normal', 7.5, C.cinza); doc.text('Foto indisponível', x + cw / 2, y + ih / 2, { align: 'center' }); }
         fonte('bold', 7.5, C.tinta); doc.text(code, x, y + ih + 4);
         const leg = legenda.get(code);
-        if (leg) { fonte('normal', 7.5, C.cinza); doc.text(doc.splitTextToSize(T(leg), cw - 15)[0] || '', x + 14.5, y + ih + 4); }
+        if (leg) { fonte('normal', 7.5, C.cinza); doc.splitTextToSize(T(leg), cw - 15).slice(0, 2).forEach((ln, li) => doc.text(ln, x + 14.5, y + ih + 4 + li * 3.4)); }
       }
       y += alt;
     }
@@ -2175,11 +2495,11 @@ async function gerarPDF(v, progresso, pronto) {
   }
 
   if (criticos.length) {
-    secao('Pontos de atenção', 'Resumo');
+    secao('Pontos de atenção', 'Resumo', 24);
     for (const { c, i } of criticos) {
       espaco(12);
       fonte('bold', 9.5, C.tinta);
-      const tit = T(`${c.nome}, ${i.nome}`);
+      const tit = doc.splitTextToSize(T(`${c.nome}, ${i.nome}`), CW - 52)[0] || '';
       doc.text(tit, M, y + 3.4);
       fonte('bold', 8, COR_EST[i.estado] || COR_EST['']);
       rotuloDireita(T(estadoLabel(i.estado).toUpperCase()), y + 3.4);
@@ -2189,14 +2509,14 @@ async function gerarPDF(v, progresso, pronto) {
     }
   }
 
-  if (v.tipo === 'saida' && v.comparacao && v.comparacao.itens && v.comparacao.itens.length) {
+  if (v.tipo === 'saida' && v.comparacao && v.comparacao.itens && v.comparacao.itens.length && e && v.comparacao.entradaId === e.id) {
     secao('Comparativo com a vistoria de entrada', e ? `Entrada de ${dataCurta(e.data)}` : 'Comparativo');
     if (v.comparacao.resumo) paragrafo(v.comparacao.resumo, { tam: 9.5, depois: 3 });
     const ordem = ['dano', 'faltando', 'desgaste_natural', 'avaliar', 'novo'];
     const comMudanca = v.comparacao.itens.filter((x) => x.situacao !== 'sem_alteracao').sort((a, b) => ordem.indexOf(a.situacao) - ordem.indexOf(b.situacao));
     for (const x of comMudanca) {
       espaco(16);
-      fonte('bold', 9.5, C.tinta); doc.text(T(`${x.comodo}, ${x.item}`), M, y + 3.4);
+      fonte('bold', 9.5, C.tinta); doc.text(doc.splitTextToSize(T(`${x.comodo}, ${x.item}`), CW - 52)[0] || '', M, y + 3.4);
       const corSit = ['dano', 'faltando'].includes(x.situacao) ? COR_EST.ruim : ['desgaste_natural', 'avaliar'].includes(x.situacao) ? COR_EST.regular : COR_EST.bom;
       fonte('bold', 8, corSit); rotuloDireita(T(sitLabel(x.situacao).toUpperCase()), y + 3.4);
       y += lh(9.5);
@@ -2212,20 +2532,26 @@ async function gerarPDF(v, progresso, pronto) {
   }
 
   for (const c of v.comodos) {
-    secao(c.nome, 'Cômodo');
+    const prim = c.itens[0];
+    fonte('normal', 9.5);
+    const altPrim = prim ? lh(10) + (prim.descricao ? doc.splitTextToSize(T(prim.descricao), CW).length * lh(9.5) : 0) + 12 : 12;
+    secao(c.nome, 'Cômodo', altPrim);
     for (const i of c.itens) {
       fonte('normal', 9.5);
       const dl = i.descricao ? doc.splitTextToSize(T(i.descricao), CW).length : 0;
       espaco(Math.min(60, lh(10) + dl * lh(9.5) + 9));
       const cor = COR_EST[i.estado] || COR_EST[''];
       doc.setFillColor(...cor); doc.rect(M, y + 1, 1.1, 3.6, 'F');
-      fonte('bold', 10, C.tinta);
-      doc.text(doc.splitTextToSize(T(i.nome), CW - 45)[0] || '', M + 3.5, y + 4);
+      const rot = T((i.critico ? 'Atenção  |  ' : '') + estadoLabel(i.estado)).toUpperCase();
       fonte('bold', 8, cor);
-      rotuloDireita(T((i.critico ? 'Atenção  |  ' : '') + estadoLabel(i.estado)).toUpperCase(), y + 4);
+      const largRot = doc.getTextWidth(rot) + 0.3 * Math.max(0, rot.length - 1);
+      fonte('bold', 10, C.tinta);
+      doc.text(doc.splitTextToSize(T(i.nome), CW - largRot - 8)[0] || '', M + 3.5, y + 4);
+      fonte('bold', 8, cor);
+      rotuloDireita(rot, y + 4);
       y += lh(10) + 1;
       if (i.descricao) paragrafo(i.descricao, { tam: 9.5, depois: 0.5 });
-      if (i.fotos.length) { fonte('normal', 8, C.cinza); espaco(5); doc.text(T('Fotos: ' + i.fotos.join(', ')), M, y + 3); y += 4.5; }
+      if (i.fotos.length) paragrafo('Fotos: ' + i.fotos.join(', '), { tam: 8, cor: C.cinza, depois: 0.5 });
       y += 1.5;
       doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, y, W - M, y);
       y += 2.5;
@@ -2267,7 +2593,7 @@ async function gerarPDF(v, progresso, pronto) {
     doc.setDrawColor(...C.linha); doc.setLineWidth(0.2); doc.line(M, H - 12.5, W - M, H - 12.5);
     fonte('normal', 7.5, C.cinza);
     const rod = [cfg.empresa, creciFmt(cfg.creci), cfg.contato].filter((s) => String(s || '').trim()).join('  |  ');
-    doc.text(T(rod), M, H - 8.5);
+    doc.text(doc.splitTextToSize(T(rod), CW - 32)[0] || '', M, H - 8.5);
     doc.text(`Página ${p} de ${total}`, W - M, H - 8.5, { align: 'right' });
   }
   return doc.output('blob');
@@ -2341,7 +2667,7 @@ function viewHome() {
       <span class="k">Vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'}${v.codigo ? ' · ' + esc(v.codigo) : ''}</span>
       <span class="t">${esc(v.endereco || 'Sem endereço')}</span>
       <span class="d">${esc(dataCurta(v.data))}</span>
-      <span class="m"><i class="sq ${v.status === 'concluida' ? 'concluida' : v.fase === 'revisao' ? 'revisao' : 'andamento'}"></i>${v.arquivada ? 'Arquivada · ' : ''}${esc(faseTexto(v))} · ${plural((v.comodos || []).length, 'cômodo', 'cômodos')} · ${plural((v.fotos || []).length, 'foto', 'fotos')}${v.criadoPor ? ` · por <span data-autor="${esc(v.criadoPor)}">${esc(S.nomes[v.criadoPor] || '...')}</span>` : ''}</span>
+      <span class="m"><i class="sq ${v.status === 'concluida' ? 'concluida' : v.fase === 'revisao' ? 'revisao' : 'andamento'}"></i>${v.arquivada ? 'Arquivada · ' : ''}${esc(faseTexto(v))} · ${plural((v.comodos || []).length, 'cômodo', 'cômodos')} · ${plural((v.fotos || []).length, 'foto', 'fotos')}${v.criadoPor ? ` · por <span data-autor="${esc(v.criadoPor)}">${esc(S.nomes[v.criadoPor] || '...')}</span>` : ''}${(v.fotos || []).some((f) => !f.pendente && !f.drive) ? ` · <span class="estado-txt est-regular">faltam fotos no Drive</span>` : ''}</span>
     </button></li>`).join('')}</ul>`;
   }
   return `<main class="shell">
@@ -2401,7 +2727,7 @@ function viewDados() {
         <div class="seg" role="radiogroup" aria-labelledby="l-tipo">
           <button type="button" role="radio" aria-checked="${v.tipo === 'entrada'}" data-act="tipo" data-val="entrada" ${v._novo ? '' : 'disabled'}>Entrada</button>
           <button type="button" role="radio" aria-checked="${v.tipo === 'saida'}" data-act="tipo" data-val="saida" ${v._novo ? '' : 'disabled'}>Saída</button>
-        </div></div>
+        </div>${v._novo ? '' : '<p class="hint">O tipo não muda depois que a vistoria é criada.</p>'}</div>
     </div>
     ${v.tipo === 'saida' ? `<div class="field"><label for="f-ent">Vistoria de entrada deste imóvel</label>
       <select id="f-ent" data-sel="entradaId">
@@ -2466,7 +2792,7 @@ function viewResultado() {
   const u = S.ultimo;
   if (!u || u.vid !== S.v.id) return '';
   const d = u.drive;
-  const driveTxt = !u.lote.fotos.length ? '' : d && d.erro && d.ok < d.total ? `<div class="msg warn"><p>Drive: ${d.ok} de ${d.total} fotos enviadas. ${esc(erroDrive(d.erro))}</p><p class="hint">Detalhe técnico, para mandar ao suporte: ${esc(detalheErro(d.erro))}</p><div class="row"><button class="btn sm" data-act="reenviar-fotos">Reenviar fotos ao Drive</button></div></div>` : `<p class="hint">Drive: ${plural(d ? d.ok : 0, 'foto enviada', 'fotos enviadas')} para a pasta Imagens.</p>`;
+  const driveTxt = !u.lote.fotos.length ? '' : d && d.erro && d.ok < d.total ? viewFotosDrive(S.v) : `<p class="hint">Drive: ${plural(d ? d.ok : 0, 'foto enviada', 'fotos enviadas')} para a pasta Imagens, conferidas.</p>`;
   return `<section class="card">
     <p class="kicker"><span class="rule"></span>Lote ${u.lote.n} processado</p>
     <h2>Lote processado com sucesso.</h2>
@@ -2487,7 +2813,7 @@ function viewRelatorioCurto(v) {
       const crit = c.itens.filter((i) => i.critico || i.estado === 'ruim').length;
       return `<li><span class="sq ${crit ? 'est-ruim' : 'est-bom'}"></span><span class="nm"><b>${esc(c.nome)}</b> · ${plural(c.itens.length, 'item', 'itens')}</span><span class="muted">${crit ? plural(crit, 'ponto de atenção', 'pontos de atenção') : ''}</span></li>`;
     }).join('')}</ul>
-    ${v.lotes.length ? `<details class="more"><summary>Lotes enviados (${v.lotes.length})</summary><div class="stack">${v.lotes.map((l) => `<div class="stack"><p><b>Lote ${l.n}</b> <span class="muted">· ${plural(l.fotos.length, 'foto', 'fotos')}</span></p>${l.resumo ? `<p class="hint">${esc(l.resumo)}</p>` : ''}<p class="hint">Fala: ${esc(l.texto.slice(0, 400))}${l.texto.length > 400 ? '...' : ''}</p></div>`).join('')}</div></details>` : ''}
+    ${v.lotes.length ? `<details class="more" ${S.confirmar && String(S.confirmar).startsWith('lote') ? 'open' : ''}><summary>Lotes enviados (${v.lotes.length})</summary><div class="stack">${v.lotes.map((l) => `<div class="stack lote-row"><div class="row"><p><b>Lote ${l.n}</b> <span class="muted">· ${plural(l.fotos.length, 'foto', 'fotos')}</span></p><span style="margin-left:auto" class="row"><button class="btn ghost sm" data-act="editar-lote" data-n="${l.n}" ${S.busy || v.loteAtual.editando ? 'disabled' : ''}>Editar</button><button class="btn ghost sm" data-act="excluir-lote" data-n="${l.n}" ${S.busy ? 'disabled' : ''}>${S.confirmar === 'lote' + l.n ? 'Confirmar exclusão' : 'Excluir'}</button></span></div>${miniFotos(v, l.fotos)}${l.resumo ? `<p class="hint">${esc(l.resumo)}</p>` : ''}<p class="hint">Fala: ${esc(l.texto.slice(0, 400))}${l.texto.length > 400 ? '...' : ''}</p></div>`).join('')}</div><p class="hint">Editar reabre o lote com as fotos e a fala; ao processar de novo, os itens desse lote são refeitos. Excluir tira o lote e as fotos do app; o que já foi para o Drive fica lá.</p></details>` : ''}
   </section>`;
 }
 function viewLotes() {
@@ -2502,11 +2828,12 @@ function viewLotes() {
     ${v.lotes.length && !resultado ? viewFotosDrive(v) : ''}
     ${resultado}
     ${mostrarForm ? `<section class="card">
-      <p class="kicker"><span class="rule"></span>Fase 2 · Lote ${n}</p>
-      <h2>${v.lotes.length ? `Lote ${n}` : 'Envie o lote 1'}</h2>
+      <p class="kicker" id="lote-topo"><span class="rule"></span>Fase 2 · ${v.loteAtual.editando ? `Editando o lote ${n}` : `Lote ${n}`}</p>
+      <h2>${v.loteAtual.editando ? `Lote ${n}, em edição` : v.lotes.length ? `Lote ${n}` : 'Envie o lote 1'}</h2>
+      ${v.loteAtual.editando ? `<div class="msg"><p>Troque fotos ou mude a fala. Ao processar de novo, os itens que este lote tinha colocado no relatório são refeitos. O que você mudou à mão em outros itens continua.</p><div class="row"><button class="btn ghost sm" data-act="cancelar-edicao">Cancelar edição</button></div></div>` : ''}
       ${primeira}
       ${semClaude}
-      ${S.podeEscrever !== false && !S.assets ? aviso('Sem permissão para guardar fotos neste app: elas ficam só nesta tela até o laudo ser gerado. Peça acesso de edição para guardar.') : ''}
+      ${S.podeEscrever !== false && !S.assets ? aviso('Sem permissão para guardar fotos neste app: se você fechar ou recarregar esta tela, as fotos se perdem. Peça acesso de edição antes de fotografar.') : ''}
       <div class="photo-actions">
         <label class="btn">${IC.cam}Tirar foto<input class="vh" type="file" accept="image/*" capture="environment" data-pick></label>
         <label class="btn">${IC.img}Escolher fotos<input class="vh" type="file" accept="image/*" multiple data-pick></label>
@@ -2518,8 +2845,8 @@ function viewLotes() {
         <p class="hint">Toque no microfone do teclado do celular e fale como se mandasse um áudio: cômodo, item e estado. O celular escreve o que você disse.</p></div>
       <div id="msg-lote">${viewMsg('lote')}</div>
       <div class="row2">
-        <button class="btn primary" data-act="processar">Processar o lote ${n}</button>
-        ${v.lotes.length ? '<button class="btn" data-act="consolidar">Encerrar e consolidar</button>' : ''}
+        <button class="btn primary" data-act="processar">${v.loteAtual.editando ? `Processar de novo o lote ${n}` : `Processar o lote ${n}`}</button>
+        ${v.lotes.length && !v.loteAtual.editando ? '<button class="btn" data-act="consolidar">Encerrar e consolidar</button>' : ''}
       </div>
     </section>` : ''}
     ${viewRelatorioCurto(v)}`;
@@ -2604,7 +2931,7 @@ function viewRevisao() {
       <p class="kicker"><span class="rule"></span>Fase 3 · Revisão</p>
       <h2>Resumo da vistoria</h2>
       <div class="summary-line"><span><b>${v.comodos.length}</b>${v.comodos.length === 1 ? 'cômodo' : 'cômodos'}</span><span><b>${nItens}</b>${nItens === 1 ? 'item' : 'itens'}</span><span><b>${v.fotos.length}</b>${v.fotos.length === 1 ? 'foto' : 'fotos'}</span><span><b>${criticos.length}</b>${criticos.length === 1 ? 'ponto de atenção' : 'pontos de atenção'}</span></div>
-      ${criticos.length ? `<div class="stack"><p class="label">Itens críticos identificados</p><ul class="changes">${criticos.map(({ c, i }) => `<li><span class="sq est-${esc(i.estado || 'ruim')}"></span><span class="nm"><b>${esc(c.nome)}</b> · ${esc(i.nome)}</span><span class="estado-txt est-${esc(i.estado)}">${esc(estadoLabel(i.estado))}</span></li>`).join('')}</ul></div>` : '<p class="muted">Nenhum item crítico identificado.</p>'}
+      ${criticos.length ? `<div class="stack"><p class="label">Pontos de atenção</p><ul class="changes">${criticos.map(({ c, i }) => `<li><span class="sq est-${esc(i.estado || 'ruim')}"></span><span class="nm"><b>${esc(c.nome)}</b> · ${esc(i.nome)}</span><span class="estado-txt est-${esc(i.estado)}">${esc(estadoLabel(i.estado))}</span></li>`).join('')}</ul></div>` : '<p class="muted">Nenhum ponto de atenção.</p>'}
       ${semEstado.length ? aviso(`Sem estado definido: ${semEstado.slice(0, 8).join('; ')}${semEstado.length > 8 ? '...' : ''}.`) : ''}
       <p class="hint">Por favor, revise os dados abaixo. Tudo é editável e salvo sozinho. Quando estiver certo, aprove no fim da página.</p>
     </section>
@@ -2645,7 +2972,7 @@ function viewLaudo() {
   return `<section class="card">
     <p class="kicker"><span class="rule"></span>Fase 4 · Laudo</p>
     <div class="done-mark"><span class="ic-ok">${IC.check}</span><h2>Vistoria concluída.</h2></div>
-    <p class="lede">O laudo de vistoria de ${tipo} do imóvel situado em ${esc(v.endereco)}, realizada em ${esc(dataLonga(v.data))}, foi gerado${v.drive && v.drive.pdf ? ` e arquivado na pasta desta vistoria no Google Drive, junto com ${plural(v.fotos.length, 'foto original', 'fotos originais')}` : ''}.</p>
+    <p class="lede">O laudo da vistoria de ${tipo} realizada em ${esc(dataLonga(v.data))}, no imóvel situado em ${esc(v.endereco)}, foi gerado${v.drive && v.drive.pdf ? ` e arquivado na pasta desta vistoria no Google Drive, junto com ${plural(v.fotos.length, 'foto original', 'fotos originais')}` : ''}.</p>
     <p class="lede">Imprima o laudo para a assinatura do locador e do locatário, ou envie o PDF para assinatura digital. Agradecemos o trabalho em campo.</p>
     ${S.laudoAviso ? aviso(S.laudoAviso) : ''}
     ${v.conferido ? `<p class="hint">Conferência dos revisores: ${v.conferido.fidelidade === 0 ? 'o PDF bate com o que foi preenchido' : v.conferido.fidelidade ? 'salvo com diferenças apontadas' : 'fidelidade não conferida'}${v.conferido.visual === 0 ? ', sem problemas de aparência' : v.conferido.visual ? ', com pontos de aparência apontados' : ''}.</p>` : ''}
@@ -2672,8 +2999,10 @@ function viewVistoria() {
   else if (S.aba === 'lotes') corpo = viewLotes();
   else if (S.aba === 'revisao') corpo = viewRevisao();
   else corpo = viewLaudo();
+  const avisoSalvar = S.save === 'error' ? aviso(S.saveErr && S.saveErr.code === 'grande' ? 'Esta vistoria ficou grande demais para salvar. Exclua lotes antigos ou fotos para ela voltar a salvar.' : 'Não consegui salvar a última alteração. Ela está guardada neste aparelho, e o app tenta de novo sozinho quando a conexão voltar.', 'bad') : '';
   return `<main class="shell">
     ${avisoAmbiente()}
+    ${avisoSalvar}
     <div class="stack" style="gap:4px">
       <p class="kicker quiet"><span class="rule"></span>Vistoria de ${v.tipo === 'saida' ? 'saída' : 'entrada'}${v.data ? ' · ' + esc(dataCurta(v.data)) : ''}</p>
       <h1 style="font-size:clamp(1.4rem,5vw,1.9rem)">${esc(v.endereco || 'Nova vistoria')}</h1>
@@ -2712,7 +3041,7 @@ function viewConfig() {
       ${pastaUrl
         ? `<p class="hint">Todas as vistorias, de todos da equipe, vão para a pasta "${esc(nomeRaiz())}". Você pode mover essa pasta para onde quiser no Drive; o app continua achando.</p><div><a class="btn sm" href="${esc(pastaUrl)}" target="_blank" rel="noopener">Abrir a pasta das vistorias</a></div>`
         : `<p class="muted">${dono ? 'A pasta ainda não existe. Crie agora para poder compartilhar com a equipe.' : 'O dono do app ainda não criou a pasta das vistorias.'}</p>`}
-      ${dono ? `<div><button class="btn primary sm" data-act="cfg-pasta" ${S.cfgOcupado ? 'disabled' : ''}>${pastaUrl ? 'Conferir se a pasta está acessível' : 'Criar a pasta agora'}</button></div>
+      ${dono ? `<div class="row"><button class="btn primary sm" data-act="cfg-pasta" ${S.cfgOcupado ? 'disabled' : ''}>${pastaUrl ? 'Conferir se a pasta está acessível' : 'Criar a pasta agora'}</button>${S.cfgPastaNova && pastaUrl ? '<button class="btn sm" data-act="cfg-pasta-nova">Criar uma pasta nova</button>' : ''}</div>
         <div class="field"><label for="c-pasta">Usar outra pasta do Drive (cole o link da pasta)</label><input id="c-pasta" data-novapasta value="${esc(S.novaPasta)}" placeholder="https://drive.google.com/drive/folders/..." autocomplete="off"></div>
         <div><button class="btn sm" data-act="cfg-trocar" ${S.cfgOcupado ? 'disabled' : ''}>Usar esta pasta</button></div>` : '<p class="hint">Só o dono do app cria ou troca a pasta.</p>'}
       ${S.cfgOcupado ? '<div class="loading-line"><span class="spin"></span>Falando com o Google Drive</div>' : ''}
@@ -2775,7 +3104,7 @@ async function irPara(tela) {
   if (S.busy) { toast('Espere terminar o que está em andamento.'); return; }
   if (S.tela === 'vistoria' && S.v && !S.v._novo) await flush();
   S.tela = tela; S.confirmar = null; S.msg = null;
-  if (tela !== 'vistoria') { S.v = null; S.ultimo = null; setSave('idle'); }
+  if (tela !== 'vistoria') { S.v = null; S.ultimo = null; S.correcao = ''; setSave('idle'); pararSync(); }
   render();
   window.scrollTo(0, 0);
 }
@@ -2801,6 +3130,10 @@ function abrir(id) {
   render();
   window.scrollTo(0, 0);
   if (recuperado) { markDirty(); toast('Recuperei alterações desta vistoria que não tinham sido salvas neste aparelho.'); }
+  S.correcao = '';
+  pararSync(); S.sync.vid = v.id; S.sync.tentativas = 0;
+  if (syncPendente(v)) agendarSync(v, 3000);
+  if (v.entradaId && !entradaDe(v)) carregarEntrada(v.entradaId);
 }
 function acharComodo(id) { return S.v && S.v.comodos.find((c) => c.id === id); }
 
@@ -2809,13 +3142,14 @@ app.addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-act]');
   if (!b || b.disabled) return;
   const act = b.dataset.act, v = S.v;
-  if (act !== 'excluir' && act !== 'rmitem' && act !== 'rmcomodo') S.confirmar = null;
+  if (act !== 'excluir' && act !== 'rmitem' && act !== 'rmcomodo' && act !== 'excluir-lote' && S.confirmar) { S.confirmar = null; if (!['abrir', 'nova', 'home', 'config', 'aba', 'onde'].includes(act)) render(); }
   switch (act) {
     case 'home': return irPara('home');
     case 'config': return irPara('config');
     case 'onde': await irPara('config'); { const el = document.getElementById('onde'); if (el) el.scrollIntoView({ block: 'start' }); } return;
     case 'cfg-pasta': return prepararPastaRaiz();
     case 'cfg-trocar': return trocarPastaRaiz();
+    case 'cfg-pasta-nova': if (S.souDono && !S.cfgOcupado) { S.cfg.driveRaizId = ''; S.cfg.driveRaizUrl = ''; S.cfg.driveRaizNome = ''; raizConferida = ''; S.cfgPastaNova = false; S.cfgAviso = ''; return prepararPastaRaiz(); } return;
     case 'planilha': return baixarPlanilha();
     case 'filtro': S.filtro = b.dataset.val; return render();
     case 'nova': S.v = novaVistoria(); S.tela = 'vistoria'; S.aba = 'dados'; S.msg = null; setSave('idle'); render(); window.scrollTo(0, 0); { const f = document.getElementById('f-end'); if (f) f.focus(); } return;
@@ -2837,6 +3171,10 @@ app.addEventListener('click', async (ev) => {
     case 'rev-voltar': S.revisao = null; render(); window.scrollTo(0, 0); return;
     case 'verificar': return verificarConexoes();
     case 'reenviar-fotos': return reenviarFotos();
+    case 'conferir-drive': return conferirDriveTudo();
+    case 'editar-lote': return editarLote(+b.dataset.n);
+    case 'excluir-lote': return excluirLote(+b.dataset.n);
+    case 'cancelar-edicao': return cancelarEdicaoLote();
     case 'conf-salvar': if (S.conferencia && v) { const k = S.conferencia; return salvarLaudo(v, k.blob, k.nome, true); } return;
     case 'conf-desfazer': return desfazerMudancasRevisor();
     case 'conf-gerar': S.conferencia = null; return finalizar();
@@ -2904,6 +3242,7 @@ app.addEventListener('input', (ev) => {
   const v = S.v;
   if (t.dataset.bind && v) {
     setCaminho(v, t.dataset.bind, t.value);
+    if (t.dataset.bind === 'parecer') { v.parecerManual = true; v.parecerDesatualizado = false; }
     if (t.dataset.bind === 'loteAtual.texto' && S.msg && S.msg.onde === 'lote' && !S.msg.fixa) { S.msg = null; const el = document.getElementById('msg-lote'); if (el) el.innerHTML = ''; }
     markDirty();
     return;
@@ -2914,7 +3253,7 @@ app.addEventListener('input', (ev) => {
   if (t.hasAttribute('data-corr')) { S.correcao = t.value; return; }
   if (t.dataset.cmp && v && v.comparacao && t.tagName === 'TEXTAREA') {
     const x = v.comparacao.itens.find((i) => i.id === t.dataset.cmp);
-    if (x) { x[t.dataset.f] = t.value; markDirty(); }
+    if (x) { x[t.dataset.f] = t.value; x.manual = true; markDirty(); }
     return;
   }
   if (t.dataset.c && v && t.type !== 'checkbox' && t.tagName !== 'SELECT') {
@@ -2932,6 +3271,7 @@ app.addEventListener('change', (ev) => {
   if (t.dataset.rev !== undefined && S.revisao) { S.revisao.marcadas[+t.dataset.rev] = t.checked; return; }
   if (t.hasAttribute('data-pick')) { const fs = t.files ? [...t.files] : []; t.value = ''; if (fs.length) aoEscolherFotos(fs); return; }
   if (t.dataset.sel === 'entradaId' && v) {
+    if (v.entradaId !== t.value && v.comparacao) v.comparacao.desatualizada = true;
     v.entradaId = t.value;
     const e = entradaDe(v);
     if (e) {
@@ -2945,7 +3285,7 @@ app.addEventListener('change', (ev) => {
   }
   if (t.dataset.cmp && v && v.comparacao && t.tagName === 'SELECT') {
     const x = v.comparacao.itens.find((i) => i.id === t.dataset.cmp);
-    if (x) { x.situacao = t.value; markDirty(); const row = t.closest('.cmp-row'); if (row) row.className = 'cmp-row sit-' + t.value; }
+    if (x) { x.situacao = t.value; x.manual = true; markDirty(); const row = t.closest('.cmp-row'); if (row) row.className = 'cmp-row sit-' + t.value; }
     return;
   }
   if (t.dataset.c && v && (t.type === 'checkbox' || t.tagName === 'SELECT')) {
@@ -2958,7 +3298,7 @@ app.addEventListener('change', (ev) => {
   }
 });
 window.addEventListener('pagehide', () => { if (S.v && !S.v._novo) flush(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && S.v && !S.v._novo) flush(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && S.v && !S.v._novo) flush(); if (document.visibilityState === 'visible' && S.v && !S.v._novo && syncPendente(S.v) && !S.sync.timer && !S.sync.rodando) agendarSync(S.v, 2000); });
 
 /* ---------- início ---------- */
 aplicarTema();
