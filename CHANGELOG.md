@@ -2,6 +2,23 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.4.0 (24/11/2026)
+
+**Lotes de 20 fotos mais rápidos**
+- As fotos são guardadas no app até três ao mesmo tempo, em vez de uma por vez. A grade mostra miniaturas leves, sem carregar a foto inteira.
+- O lote termina assim que o Claude responde. As fotos seguem para o Google Drive em segundo plano, três ao mesmo tempo, e dá para começar o próximo lote sem esperar. A garantia continua igual: cada foto é conferida na pasta, o que falhar volta para a fila, e o laudo só sai depois de tudo enviado e conferido.
+- Cada foto é enviada ao Drive uma vez só, no tamanho em que foi guardada. Se a resposta do Drive for duvidosa, o app procura a foto na pasta antes de mandar de novo.
+- A cópia de segurança dos dados também vai para o Drive sem prender a tela.
+- O app salva menos vezes durante o envio das fotos, o que deixa o celular mais leve. O rascunho no aparelho continua protegendo o que ainda não foi salvo.
+
+**Dá para ver o que está acontecendo**
+- Enquanto o Claude trabalha, a tela mostra há quanto tempo ele está olhando as fotos e quantos itens já escreveu.
+- Ao sair de uma vistoria com fotos ainda a caminho do Drive, o app avisa que o envio continua quando ela for aberta de novo.
+- Um erro antigo do Drive, já resolvido, não volta a aparecer no painel.
+
+**Medição**
+- Cada lote guarda quanto tempo levou para guardar as fotos, para o Claude responder e para o Drive receber. O cartão do lote mostra o resumo, e os números ficam na vistoria para o suporte.
+
 ## 1.3.1 (27/10/2026)
 
 - O visual padrão é genérico, para qualquer imobiliária. A identidade de cada uma (logo, cores e capa) entra só em Configurações.
