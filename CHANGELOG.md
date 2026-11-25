@@ -2,6 +2,34 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.5.0 (25/11/2026)
+
+**Melhorias pedidas pela equipe**
+- O tipo da vistoria (entrada ou saída) pode ser trocado a qualquer momento, inclusive em vistorias antigas. O botão aparece em Dados e no topo de cada lote.
+- Fotos extras: dá para adicionar fotos a um lote já enviado ou direto a um item, na Revisão, sem refazer o lote e sem passar de novo pelo Claude. Funciona também depois do laudo.
+- Junto com o PDF, o app salva na mesma pasta um arquivo Word (.docx) editável, com o mesmo conteúdo e as fotos. Se o arquivo não couber no envio, ele vai com fotos menores ou só com o texto. Também dá para baixar o Word na tela do laudo.
+- Laudo padronizado: página A4 com margens de 2 cm, texto justificado e o mesmo rodapé em todas as páginas (empresa, CRECI, contato, tipo e data do laudo, página X de Y), no PDF e no Word.
+
+**Segurança**
+- Só a equipe convidada lê as vistorias. Quem tem acesso só de leitura, ou chega por link público, não vê mais nada.
+- Tudo o que vem do banco é conferido antes de ir para a tela: um registro estragado não derruba o app nem insere código.
+- Os links do Drive são montados pelo próprio app, e os códigos de pasta são conferidos antes de qualquer envio.
+- As bibliotecas externas (PDF) só carregam se forem exatamente as originais.
+- Vistoria excluída não volta sozinha, nem neste aparelho nem em outro que estava com ela aberta. O rascunho de um usuário não entra na conta de outro no mesmo aparelho, e rascunhos esquecidos somem em até 7 dias.
+- Instalação e atualização baixam só a versão publicada como release, com conferência de que o arquivo é o original.
+
+**Proteção contra texto malicioso em fotos e falas**
+- Um lote novo não melhora sozinho o estado de um item que já estava ruim ou regular, nem tira um ponto de atenção: o app pede confirmação.
+- A correção falada só remove em massa o que foi citado pelo nome, e a lista do que mudou fica na tela com o botão de desfazer.
+- Na comparação entre entrada e saída, os estados vêm do que está guardado no app. Item que o Claude pulou entra como "a avaliar".
+
+**Privacidade**
+- O link da pasta do Drive não vai mais no laudo, a não ser que o dono ligue essa opção em Configurações.
+- As cópias de segurança saíram da pasta de cada vistoria e foram para a pasta "Cópias de segurança (uso interno)", sem dados técnicos do aparelho.
+- O endereço do imóvel não é mais enviado ao Claude. Aviso na tela do lote para não fotografar pessoas nem documentos.
+- Aviso "alterada depois do laudo" quando uma vistoria muda depois de o PDF ter sido gerado.
+- A tela "Onde ficam os dados" conta tudo: o que o Claude recebe, o que fica no Drive e o que continua lá depois de excluir.
+
 ## 1.4.0 (24/11/2026)
 
 **Lotes de 20 fotos mais rápidos**
