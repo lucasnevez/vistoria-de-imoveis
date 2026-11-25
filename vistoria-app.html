@@ -308,7 +308,7 @@ const sitLabel = (s) => (SITUACOES.find((x) => x[0] === s) || [null, 'A avaliar'
 const FASES = ['dados', 'lotes', 'revisao', 'laudo'];
 const FASE_NOME = { dados: 'Dados', lotes: 'Lotes', revisao: 'Revisão', laudo: 'Laudo' };
 /* Versão do app: atualize junto com o CHANGELOG.md e a tag do GitHub a cada mudança. */
-const VERSAO = '1.5.0';
+const VERSAO = '1.5.1';
 /* Marca de quem fornece o app, em lugar discreto (fim das Configurações e rodapé do PDF). Vazio = não aparece. */
 const AGENCIA = { nome: '', site: '' };
 const MAX_FOTOS = 20;
@@ -2692,7 +2692,7 @@ function zipSemCompressao(arquivos, mime) {
   f.setUint32(0, 0x06054b50, true); f.setUint16(8, arquivos.length, true); f.setUint16(10, arquivos.length, true); f.setUint32(12, tamCentral, true); f.setUint32(16, pos, true);
   return new Blob([...partes, ...central, new Uint8Array(f.buffer)], { type: mime });
 }
-const xmlEsc = (t) => String(t ?? '').normalize('NFC').replace(/[^\x09\x0A\x0D\x20-퟿-�]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const xmlEsc = (t) => String(t ?? '').normalize('NFC').replace(/[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /* nivel 0: fotos em 900 px; nivel 1: fotos menores; nivel 2: só o texto (quando o arquivo não cabe no envio ao Drive). */
 async function gerarDocx(v, nivel) {
   const cfg = S.cfg;

@@ -2,6 +2,10 @@
 
 A versão em uso aparece no app, em Configurações, no fim da página.
 
+## 1.5.1 (25/11/2026)
+
+- Correção: a versão 1.5.0 tinha um caractere especial numa linha do gerador do Word que impedia a publicação do app. Quem for instalar ou atualizar recebe direto a 1.5.1, com tudo o que a 1.5.0 trouxe.
+
 ## 1.5.0 (25/11/2026)
 
 **Melhorias pedidas pela equipe**
